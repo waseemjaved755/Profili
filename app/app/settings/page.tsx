@@ -2,6 +2,7 @@
 
 import { ButtonLink } from "@/components/ui/button";
 import { PageTransition } from "@/components/ui/page-transition";
+import { openConsentBanner } from "@/lib/consent";
 import { useSession } from "@/lib/session";
 
 export default function SettingsPage() {
@@ -23,6 +24,16 @@ export default function SettingsPage() {
         <li className="flex items-center justify-between border-b border-border py-4">
           <span>Language</span>
           <span className="text-muted">{user.language === "fr" ? "French" : "English"}</span>
+        </li>
+        <li className="flex items-center justify-between border-b border-border py-4">
+          <span>Cookies</span>
+          <button
+            type="button"
+            onClick={() => openConsentBanner()}
+            className="text-[14px] font-medium text-ink underline underline-offset-4"
+          >
+            Manage
+          </button>
         </li>
       </ul>
       <div className="mt-10">

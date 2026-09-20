@@ -2,6 +2,7 @@ import { requireUser } from "@/lib/auth/require-user";
 import { buildStoredProfile, publishBodySchema, type ProfileJson } from "@/lib/resume/schema";
 import { uniqueSlug } from "@/lib/resume/sanitize";
 import { publicProfileUrl } from "@/lib/site";
+import { revalidateTag } from "next/cache";
 import { NextResponse } from "next/server";
 
 export async function POST(request: Request) {
@@ -81,6 +82,11 @@ export async function POST(request: Request) {
       { error: error?.message || "Could not publish." },
       { status: 500 },
     );
+  }
+
+  revalidateTag(`profile:${profile.slug}`, "max");
+  if (existing.slug && existing.slug !== profile.slug) {
+    revalidateTag(`profile:${existing.slug}`, "max");
   }
 
   return NextResponse.json({

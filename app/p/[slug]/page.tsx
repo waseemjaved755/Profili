@@ -1,8 +1,54 @@
 import { PublicVoiceCall } from "@/components/talk/public-voice-call";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { getPublishedCard } from "@/lib/resume/public";
+import { getPublishedCard, getPublishedShare } from "@/lib/resume/public";
+import { noIndex, SITE_DESCRIPTION, SITE_TITLE, truncateMeta } from "@/lib/seo";
+import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
+
+export async function generateMetadata({
+  params,
+  searchParams,
+}: {
+  params: Promise<{ slug: string }>;
+  searchParams: Promise<{ embed?: string }>;
+}): Promise<Metadata> {
+  const { slug } = await params;
+  const { embed } = await searchParams;
+  const isEmbed = embed === "1" || embed === "true";
+  const profile = await getPublishedShare(slug);
+
+  if (!profile) {
+    return {
+      title: SITE_TITLE,
+      description: SITE_DESCRIPTION,
+      robots: noIndex,
+    };
+  }
+
+  const title = `${profile.full_name}'s AI`;
+  const description = truncateMeta(
+    `Talk to ${profile.full_name}'s AI.${profile.headline ? ` ${profile.headline}` : ""}`,
+  );
+
+  return {
+    title,
+    description,
+    robots: isEmbed ? noIndex : undefined,
+    openGraph: {
+      title,
+      description,
+      url: `/p/${slug}`,
+      type: "website",
+      siteName: "Profili",
+    },
+    twitter: {
+      card: "summary_large_image",
+      title,
+      description,
+    },
+  };
+}
 
 export default async function PublicProfilePage({
   params,

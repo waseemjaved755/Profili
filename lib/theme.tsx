@@ -9,9 +9,9 @@ import {
   useState,
 } from "react";
 
-export type Theme = "light" | "dark";
+import { THEME_KEY, readConsent } from "@/lib/consent";
 
-const STORAGE_KEY = "profili-theme";
+export type Theme = "light" | "dark";
 
 type ThemeContextValue = {
   theme: Theme;
@@ -31,8 +31,8 @@ function applyTheme(theme: Theme) {
 export function getInitialTheme(): Theme {
   if (typeof window === "undefined") return "light";
   try {
-    const stored = localStorage.getItem(STORAGE_KEY);
-    if (stored === "dark" || stored === "light") return stored;
+    const stored = localStorage.getItem(THEME_KEY);
+    if (readConsent().functional && (stored === "dark" || stored === "light")) return stored;
   } catch {
     /* ignore */
   }
@@ -56,7 +56,9 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     setThemeState(next);
     applyTheme(next);
     try {
-      localStorage.setItem(STORAGE_KEY, next);
+      if (readConsent().functional) {
+        localStorage.setItem(THEME_KEY, next);
+      }
     } catch {
       /* ignore */
     }

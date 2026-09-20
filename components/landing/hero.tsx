@@ -153,9 +153,9 @@ export function Hero({
     <section className="flex min-h-[calc(100svh-4.5rem)] items-center px-4 pb-20 pt-12 sm:px-6 sm:pt-16">
       <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-12 lg:gap-8">
         <div className="lg:col-span-5">
-          <h1 className="display">
+          <h1 className="hero-display">
             Your Resume can{" "}
-            <span className="grad-ocean">Talk.</span>
+            <span className="hero-display-em grad-ocean">Talk.</span>
           </h1>
           <p className="mt-6 max-w-md text-[16px] text-muted">
             Share a link instead of a PDF. Recruiters ask questions, your AI
