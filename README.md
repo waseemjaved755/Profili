@@ -128,7 +128,7 @@ flowchart TB
   subgraph jobs [Inngest]
     ParseFn[parse-resume]
     FinalFn[finalize-call]
-    SweepFn["sweeper cron * * * * *"]
+    SweepFn["sweeper cron 0 0,12 * * *"]
   end
 
   subgraph vendors [Vendors]
@@ -215,7 +215,7 @@ sequenceDiagram
   End->>Inngest: call.ended once
 ```
 
-A cron every minute ends calls with no `ended_at` and `started_at` older than 90s, then emits the same `call.ended` event.
+A cron twice a day (00:00 and 12:00 UTC) ends calls with no `ended_at` and `started_at` older than 90s, then emits the same `call.ended` event.
 
 ### After the call
 
@@ -243,7 +243,7 @@ flowchart LR
   subgraph events [Events]
     RU[resume.uploaded]
     CE[call.ended]
-    CR["cron * * * * *"]
+    CR["cron 0 0,12 * * *"]
   end
 
   subgraph fns [Functions]
@@ -262,7 +262,7 @@ flowchart LR
 | --- | --- | --- |
 | `parse-resume` | `resume.uploaded` | `profile_json`, `parse_status` |
 | `finalize-call` | `call.ended` | `transcript_turns`, insights |
-| Sweeper | cron every minute | `ended_at` on abandoned calls, then `call.ended` |
+| Sweeper | cron twice a day (00:00 and 12:00 UTC) | `ended_at` on abandoned calls, then `call.ended` |
 
 ### Data
 

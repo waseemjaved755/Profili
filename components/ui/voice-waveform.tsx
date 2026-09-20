@@ -12,8 +12,10 @@ function amp(state: VoiceState) {
     case "listening":
       return 0.72;
     case "processing":
+    case "thinking":
       return 0.5;
     case "error":
+    case "ended":
       return 0.22;
     default:
       return 0.38;
@@ -27,6 +29,7 @@ function speed(state: VoiceState) {
     case "listening":
       return 0.7;
     case "processing":
+    case "thinking":
       return 0.9;
     default:
       return 1.35;

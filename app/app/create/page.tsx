@@ -125,7 +125,8 @@ export default function CreatePage() {
         >
           <VoiceOrb
             size={phase === "ready" ? 260 : 170}
-            state={phase === "ready" ? "speaking" : "processing"}
+            state={phase === "ready" ? "speaking" : "thinking"}
+            name={first}
           />
         </motion.div>
         <AnimatePresence mode="wait">

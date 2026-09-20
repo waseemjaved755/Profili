@@ -30,6 +30,7 @@ export function PublicVoiceCall({
   const [email, setEmail] = useState("");
   const [error, setError] = useState("");
   const [voice, setVoice] = useState<VoiceState>("idle");
+  const [level, setLevel] = useState(0);
   const [remaining, setRemaining] = useState(CALL_SECONDS);
 
   const wsRef = useRef<WebSocket | null>(null);
@@ -42,6 +43,10 @@ export function PublicVoiceCall({
   const seqRef = useRef(0);
   const endingRef = useRef(false);
   const assemblySessionIdRef = useRef<string | null>(null);
+  const voiceRef = useRef<VoiceState>("idle");
+  const micAnalyserRef = useRef<AnalyserNode | null>(null);
+  const playAnalyserRef = useRef<AnalyserNode | null>(null);
+  voiceRef.current = voice;
   const [captions, setCaptions] = useState<Array<{ speaker: "visitor" | "agent"; text: string }>>(
     [],
   );
@@ -105,6 +110,8 @@ export function PublicVoiceCall({
     flushPlayback();
     await ctxRef.current?.close().catch(() => undefined);
     ctxRef.current = null;
+    micAnalyserRef.current = null;
+    playAnalyserRef.current = null;
     const callId = callIdRef.current;
     const transcriptToken = transcriptTokenRef.current;
     if (sendEnd && callId && transcriptToken) {
@@ -206,12 +213,20 @@ export function PublicVoiceCall({
       playbackTimeRef.current = audioCtx.currentTime;
       await audioCtx.audioWorklet.addModule("/pcm-processor.js");
       const source = audioCtx.createMediaStreamSource(stream);
+      const micAnalyser = audioCtx.createAnalyser();
+      micAnalyser.fftSize = 256;
+      micAnalyserRef.current = micAnalyser;
+      const playAnalyser = audioCtx.createAnalyser();
+      playAnalyser.fftSize = 256;
+      playAnalyserRef.current = playAnalyser;
+      playAnalyser.connect(audioCtx.destination);
       const worklet = new AudioWorkletNode(audioCtx, "pcm-processor", {
         processorOptions: {
           inputSampleRate: audioCtx.sampleRate,
           targetSampleRate: 24000,
         },
       });
+      source.connect(micAnalyser);
       source.connect(worklet);
 
       const wsUrl = new URL("wss://agents.assemblyai.com/v1/ws");
@@ -310,7 +325,9 @@ export function PublicVoiceCall({
     buffer.getChannelData(0).set(float32);
     const src = audioCtx.createBufferSource();
     src.buffer = buffer;
-    src.connect(audioCtx.destination);
+    const playAnalyser = playAnalyserRef.current;
+    if (playAnalyser) src.connect(playAnalyser);
+    else src.connect(audioCtx.destination);
     const now = audioCtx.currentTime;
     playbackTimeRef.current = Math.max(playbackTimeRef.current, now);
     src.start(playbackTimeRef.current);
@@ -325,8 +342,39 @@ export function PublicVoiceCall({
     if (step === "ended") return;
     await teardown(true);
     setVoice("idle");
+    setLevel(0);
     setStep("ended");
   }
+
+  useEffect(() => {
+    if (step !== "call") return;
+    const data = new Uint8Array(256);
+    let raf = 0;
+    let live = true;
+
+    function sample() {
+      const speaking = voiceRef.current === "speaking";
+      const analyser = speaking ? playAnalyserRef.current : micAnalyserRef.current;
+      if (analyser) {
+        analyser.getByteTimeDomainData(data);
+        let sum = 0;
+        for (let i = 0; i < data.length; i += 1) {
+          const n = ((data[i] ?? 128) - 128) / 128;
+          sum += n * n;
+        }
+        setLevel(Math.min(1, Math.sqrt(sum / data.length) * 3.2));
+      } else {
+        setLevel(0);
+      }
+      if (live) raf = window.requestAnimationFrame(sample);
+    }
+
+    raf = window.requestAnimationFrame(sample);
+    return () => {
+      live = false;
+      window.cancelAnimationFrame(raf);
+    };
+  }, [step]);
 
   useEffect(() => {
     if (step !== "call") return;
@@ -369,7 +417,12 @@ export function PublicVoiceCall({
       voice === "speaking" ? "Speaking" : voice === "listening" ? "Listening" : "Connecting";
     return (
       <div className="mt-10 flex flex-col items-center text-center">
-        <VoiceOrb size={220} state={voice === "idle" ? "processing" : voice} />
+        <VoiceOrb
+          size={220}
+          state={voice === "idle" ? "thinking" : voice}
+          level={level}
+          name={fullName.split(" ")[0] || "Voice agent"}
+        />
         <p className="mt-6 font-mono text-[28px] tabular-nums">{remaining}s</p>
         <p className="mt-2 text-[15px] text-muted">{indicator}</p>
         {captions.length > 0 ? (

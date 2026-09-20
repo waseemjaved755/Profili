@@ -7,5 +7,7 @@ export type VoiceState =
   | "idle"
   | "listening"
   | "processing"
+  | "thinking"
   | "speaking"
-  | "error";
+  | "error"
+  | "ended";

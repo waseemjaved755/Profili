@@ -2,18 +2,10 @@
 
 import { useSetResumePick } from "@/components/landing/resume-pick";
 import { GoLiveButton } from "@/components/ui/go-live-button";
-import { resumes, visuals, type ResumeProfile } from "@/lib/visuals";
-import { FileUp } from "lucide-react";
+import { resumes, type ResumeProfile } from "@/lib/visuals";
+import { FileUp, Link2 } from "lucide-react";
 import { motion, useReducedMotion, type MotionValue } from "framer-motion";
 import { useEffect, useState } from "react";
-
-const faces = [
-  visuals.candidate,
-  visuals.recruiter,
-  visuals.handshake,
-  visuals.meeting,
-  visuals.laptop,
-];
 
 const spring = { type: "spring", stiffness: 320, damping: 28, mass: 0.7 } as const;
 
@@ -162,13 +154,12 @@ export function Hero({
       <div className="mx-auto grid max-w-7xl items-center gap-10 lg:grid-cols-12 lg:gap-8">
         <div className="lg:col-span-5">
           <h1 className="display">
-            Your resume can{" "}
-            <span className="grad-ocean">talk.</span>
-            <span className="mt-1 block">Days, not weeks.</span>
+            Your Resume can{" "}
+            <span className="grad-ocean">Talk.</span>
           </h1>
           <p className="mt-6 max-w-md text-[16px] text-muted">
-            Your CV answers in its own voice. Recruiters hear the architecture,
-            the stack, and the impact in seconds.
+            Share a link instead of a PDF. Recruiters ask questions, your AI
+            answers, anytime.
           </p>
           <div className="mt-8 flex flex-wrap items-center gap-3">
             <label
@@ -192,21 +183,10 @@ export function Hero({
             </label>
             <GoLiveButton className="h-11" />
           </div>
-          <div className="mt-8 flex items-center gap-3">
-            <div className="flex -space-x-2">
-              {faces.map((src) => (
-                <img
-                  key={src}
-                  src={src}
-                  alt=""
-                  className="h-10 w-10 rounded-full border border-border object-cover"
-                />
-              ))}
-            </div>
-            <p className="text-[13px] font-medium text-muted">
-              120+ staff engineers already live
-            </p>
-          </div>
+          <p className="mt-8 flex items-center gap-2 text-[13px] font-medium text-muted">
+            <Link2 size={14} strokeWidth={2.2} aria-hidden />
+            Upload a PDF. Get a shareable voice link.
+          </p>
         </div>
 
         <ResumeStack flying={flying} frontOpacity={frontOpacity} />

@@ -33,8 +33,8 @@ export function Steps() {
         color: "bg-deep",
         ink: "text-white",
         detailLabel: "Link",
-        detail: "profili.me/share",
-        footnote: "profili.me/share",
+        detail: "Link it, or embed it on your site.",
+        footnote: "your-slug",
       },
     ],
     [person.firstName, person.skills],
@@ -53,7 +53,7 @@ export function Steps() {
             </h2>
             <p className="mt-4 max-w-md text-[16px] text-ink/80">
               The deck cycles {person.firstName}&apos;s page through read, tune, and
-              share. Skills stay grounded. Then the link is live.
+              share. Skills stay grounded. Then you share a link or an embed.
             </p>
           </div>
 

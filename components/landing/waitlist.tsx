@@ -62,14 +62,15 @@ export function Waitlist() {
                   type="email"
                   required
                   autoComplete="email"
+                  inputMode="email"
                   value={email}
                   onChange={(event) => setEmail(event.target.value)}
                   placeholder="Enter Your Email"
-                  className="h-11 flex-1 rounded-lg border border-border bg-subtle px-4 text-sm font-medium text-ink outline-none transition-colors placeholder:text-steel focus:border-steel/40 dark:bg-[#012A4A]/40"
+                  className="min-h-12 w-full flex-1 rounded-lg border border-border bg-subtle px-4 py-3 text-base font-medium leading-normal text-ink outline-none transition-colors placeholder:text-steel focus:border-steel/40 sm:min-h-11 sm:py-0 sm:text-sm dark:bg-[#012A4A]/40"
                 />
                 <button
                   type="submit"
-                  className="inline-flex h-11 shrink-0 items-center justify-center rounded-lg bg-btn px-5 text-sm font-medium text-btn-fg shadow-sm transition-all duration-150 hover:bg-btn-hover active:scale-[0.98]"
+                  className="inline-flex min-h-12 w-full shrink-0 items-center justify-center rounded-lg bg-btn px-5 text-base font-medium text-btn-fg shadow-sm transition-all duration-150 hover:bg-btn-hover active:scale-[0.98] sm:min-h-11 sm:w-auto sm:text-sm"
                 >
                   Join waitlist
                 </button>
