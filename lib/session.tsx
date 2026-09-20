@@ -1,120 +1,160 @@
 "use client";
 
+import type { User } from "@supabase/supabase-js";
 import {
   createContext,
   useCallback,
   useContext,
+  useEffect,
   useMemo,
-  useSyncExternalStore,
+  useState,
 } from "react";
-import { demoUser, greetingFor, handleFromName, STORAGE_KEY } from "./mock";
+import { greetingFor, handleFromName } from "./mock";
+import { isSupabaseConfigured } from "./supabase/env";
 import type { Profile } from "./types";
 
 type SessionContextValue = {
   user: Profile | null;
   ready: boolean;
-  login: (email: string, name?: string) => Profile;
-  signup: (name: string, email: string) => Profile;
   update: (patch: Partial<Profile>) => void;
-  logout: () => void;
+  logout: () => Promise<void>;
 };
 
 const SessionContext = createContext<SessionContextValue | null>(null);
 
-const listeners = new Set<() => void>();
-let memory: Profile | null | undefined;
-
-function emit() {
-  memory = undefined;
-  listeners.forEach((listener) => listener());
+function extrasKey(userId: string) {
+  return `profili-profile:${userId}`;
 }
 
-function read(): Profile | null {
-  if (typeof window === "undefined") return null;
-  if (memory !== undefined) return memory;
+type ProfileExtras = Partial<
+  Pick<
+    Profile,
+    | "name"
+    | "handle"
+    | "role"
+    | "skills"
+    | "voice"
+    | "language"
+    | "personality"
+    | "formality"
+    | "verbosity"
+    | "greeting"
+    | "hasResume"
+    | "hasAgent"
+    | "fileName"
+    | "agentId"
+  >
+>;
+
+function readExtras(userId: string): ProfileExtras {
   try {
-    const raw = localStorage.getItem(STORAGE_KEY);
-    memory = raw ? (JSON.parse(raw) as Profile) : null;
+    const raw = localStorage.getItem(extrasKey(userId));
+    return raw ? (JSON.parse(raw) as ProfileExtras) : {};
   } catch {
-    localStorage.removeItem(STORAGE_KEY);
-    memory = null;
+    localStorage.removeItem(extrasKey(userId));
+    return {};
   }
-  return memory;
 }
 
-function write(next: Profile | null) {
-  if (typeof window === "undefined") return;
-  if (next) localStorage.setItem(STORAGE_KEY, JSON.stringify(next));
-  else localStorage.removeItem(STORAGE_KEY);
-  memory = next;
-  emit();
+function writeExtras(userId: string, extras: ProfileExtras) {
+  localStorage.setItem(extrasKey(userId), JSON.stringify(extras));
 }
 
-function subscribe(listener: () => void) {
-  listeners.add(listener);
-  return () => listeners.delete(listener);
-}
+function profileFromUser(authUser: User): Profile {
+  const extras = readExtras(authUser.id);
+  const meta = authUser.user_metadata ?? {};
+  const name =
+    extras.name ||
+    (typeof meta.full_name === "string" && meta.full_name) ||
+    (typeof meta.name === "string" && meta.name) ||
+    authUser.email?.split("@")[0] ||
+    "You";
+  const handle = extras.handle || handleFromName(name);
 
-function freshUser(name: string, email: string): Profile {
-  const handle = handleFromName(name);
   return {
     name,
-    email,
+    email: authUser.email ?? "",
     handle,
-    role: "",
-    skills: [],
-    voice: "Alex",
-    language: "en",
-    personality: "professional",
-    formality: 0.3,
-    verbosity: 0.5,
-    greeting: greetingFor(name),
-    hasResume: false,
-    hasAgent: false,
-    agentId: handle,
+    role: extras.role ?? "",
+    skills: extras.skills ?? [],
+    voice: extras.voice ?? "Alex",
+    language: extras.language ?? "en",
+    personality: extras.personality ?? "professional",
+    formality: extras.formality ?? 0.3,
+    verbosity: extras.verbosity ?? 0.5,
+    greeting: extras.greeting ?? greetingFor(name),
+    hasResume: extras.hasResume ?? false,
+    hasAgent: extras.hasAgent ?? false,
+    fileName: extras.fileName,
+    agentId: extras.agentId ?? handle,
   };
 }
 
 export function SessionProvider({ children }: { children: React.ReactNode }) {
-  const user = useSyncExternalStore(subscribe, read, () => null);
-  const ready = useSyncExternalStore(
-    () => () => {},
-    () => true,
-    () => false,
+  const [authUser, setAuthUser] = useState<User | null>(null);
+  const [user, setUser] = useState<Profile | null>(null);
+  const [ready, setReady] = useState(false);
+
+  useEffect(() => {
+    if (!isSupabaseConfigured()) {
+      setReady(true);
+      return;
+    }
+
+    let cancelled = false;
+    let unsubscribe = () => {};
+
+    (async () => {
+      const { createClient } = await import("./supabase/client");
+      const supabase = createClient();
+
+      const {
+        data: { user: current },
+      } = await supabase.auth.getUser();
+      if (cancelled) return;
+      setAuthUser(current);
+      setUser(current ? profileFromUser(current) : null);
+      setReady(true);
+
+      const { data } = supabase.auth.onAuthStateChange((_event, session) => {
+        const next = session?.user ?? null;
+        setAuthUser(next);
+        setUser(next ? profileFromUser(next) : null);
+      });
+      unsubscribe = () => data.subscription.unsubscribe();
+    })();
+
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+
+  const update = useCallback(
+    (patch: Partial<Profile>) => {
+      if (!authUser) return;
+      const merged = { ...readExtras(authUser.id), ...patch };
+      writeExtras(authUser.id, merged);
+      setUser(profileFromUser(authUser));
+    },
+    [authUser],
   );
 
-  const login = useCallback((email: string, name?: string) => {
-    const existing = read();
-    if (existing && existing.email === email) {
-      write(existing);
-      return existing;
+  const logout = useCallback(async () => {
+    if (!isSupabaseConfigured()) {
+      setAuthUser(null);
+      setUser(null);
+      return;
     }
-    if (email.toLowerCase() === demoUser.email) {
-      write(demoUser);
-      return demoUser;
-    }
-    const next = existing ?? freshUser(name || "Waseem Javed", email);
-    write(next);
-    return next;
+    const { createClient } = await import("./supabase/client");
+    await createClient().auth.signOut();
+    setAuthUser(null);
+    setUser(null);
   }, []);
-
-  const signup = useCallback((name: string, email: string) => {
-    const next = freshUser(name.trim() || "Waseem Javed", email.trim());
-    write(next);
-    return next;
-  }, []);
-
-  const update = useCallback((patch: Partial<Profile>) => {
-    const current = read();
-    if (!current) return;
-    write({ ...current, ...patch });
-  }, []);
-
-  const logout = useCallback(() => write(null), []);
 
   const value = useMemo(
-    () => ({ user, ready, login, signup, update, logout }),
-    [user, ready, login, signup, update, logout],
+    () => ({ user, ready, update, logout }),
+    [user, ready, update, logout],
   );
 
   return (

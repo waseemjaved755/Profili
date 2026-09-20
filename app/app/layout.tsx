@@ -10,7 +10,7 @@ export default function AppLayout({
     <div className="min-h-full">
       <AuthGate>
         <AppNav />
-        <div className="mx-auto w-full max-w-5xl px-5 py-12 sm:py-16">{children}</div>
+        <div className="mx-auto w-full max-w-6xl px-5 py-10 sm:py-14">{children}</div>
       </AuthGate>
     </div>
   );

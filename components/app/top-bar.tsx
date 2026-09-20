@@ -10,10 +10,16 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState } from "react";
 
 const links = [
+  { href: "/app/dashboard", label: "Dashboard" },
   { href: "/app", label: "My Agent" },
   { href: "/app/profile", label: "Profile" },
   { href: "/app/settings", label: "Settings" },
 ];
+
+function linkActive(pathname: string, href: string) {
+  if (href === "/app") return pathname === "/app";
+  return pathname === href || pathname.startsWith(`${href}/`);
+}
 
 export function AppNav() {
   const pathname = usePathname();
@@ -22,9 +28,15 @@ export function AppNav() {
   const [open, setOpen] = useState(false);
   const initial = (user?.name || "P").charAt(0).toUpperCase();
 
+  async function signOut() {
+    await logout();
+    router.push("/");
+    router.refresh();
+  }
+
   return (
     <header className="sticky top-0 z-30 border-b border-border bg-surface/75 backdrop-blur-xl">
-      <div className="mx-auto flex h-16 max-w-5xl items-center justify-between px-5">
+      <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-5">
         <Wordmark href="/app" size="sm" />
         <nav className="hidden items-center gap-2 md:flex">
           {links.map((link) => (
@@ -32,7 +44,7 @@ export function AppNav() {
               key={link.href}
               href={link.href}
               className={`rounded-lg px-3 py-1.5 text-sm font-medium transition-colors duration-150 ${
-                pathname === link.href ? "bg-subtle text-ink" : "text-muted hover:text-ink"
+                linkActive(pathname, link.href) ? "bg-subtle text-ink" : "text-muted hover:text-ink"
               }`}
             >
               {link.label}
@@ -52,10 +64,7 @@ export function AppNav() {
           <button
             type="button"
             className="hidden text-[13px] font-medium text-muted transition-colors hover:text-ink sm:inline"
-            onClick={() => {
-              logout();
-              router.push("/");
-            }}
+            onClick={() => void signOut()}
           >
             Log out
           </button>
@@ -79,10 +88,7 @@ export function AppNav() {
           <button
             type="button"
             className="text-left font-bold text-ink"
-            onClick={() => {
-              logout();
-              router.push("/");
-            }}
+            onClick={() => void signOut()}
           >
             Log out
           </button>
