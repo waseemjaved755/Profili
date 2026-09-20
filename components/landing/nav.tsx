@@ -7,7 +7,7 @@ import { useState } from "react";
 
 const links = [
   { href: "#how", label: "How it Works" },
-  { href: "#sandbox", label: "Live Sandbox", badge: "Live" },
+  { href: "#embed", label: "Embed" },
   { href: "#insights", label: "Insights" },
   { href: "#waitlist", label: "Waitlist" },
 ];
@@ -27,12 +27,6 @@ export function LandingNav() {
               className="relative text-sm font-medium text-muted transition-colors duration-150 hover:text-ink"
             >
               {link.label}
-              {link.badge && (
-                <span className="ml-1.5 inline-flex items-center gap-1 rounded-full border border-border bg-subtle px-1.5 py-0.5 font-mono text-[9px] font-medium uppercase text-navy">
-                  <span className="ping-live h-1.5 w-1.5 rounded-full bg-good" />
-                  {link.badge}
-                </span>
-              )}
             </a>
           ))}
         </nav>

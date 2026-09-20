@@ -7,7 +7,7 @@ import Link from "next/link";
 
 const product = [
   { href: "#how", label: "How it Works" },
-  { href: "#sandbox", label: "Live Sandbox" },
+  { href: "#embed", label: "Embed" },
   { href: "#insights", label: "Insights" },
   { href: "#waitlist", label: "Waitlist" },
 ];

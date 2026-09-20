@@ -4,7 +4,7 @@ import { Hero, ResumeCard } from "@/components/landing/hero";
 import { useResumePick } from "@/components/landing/resume-pick";
 import { SineEqualizer } from "@/components/landing/sine-eq";
 import { VoiceOrb } from "@/components/ui/voice-orb";
-import { visuals, type ResumeProfile } from "@/lib/visuals";
+import type { ResumeProfile } from "@/lib/visuals";
 import {
   motion,
   useMotionValue,
@@ -68,7 +68,7 @@ function ConvertStage({
   const copyY = useTransform(progress, [0.58, 0.78], [reduce ? 0 : 28, 0]);
 
   return (
-    <section ref={stageRef} id="sandbox" className="relative h-[220vh]">
+    <section ref={stageRef} className="relative h-[220vh]">
       <div className="sticky top-14 flex min-h-[calc(100svh-3.5rem)] items-center overflow-hidden px-4 py-10 sm:top-16 sm:min-h-[calc(100svh-4rem)] sm:px-6">
         <div className="mx-auto grid w-full max-w-7xl items-center gap-10 lg:grid-cols-2">
           <div className="relative mx-auto flex h-[420px] w-full max-w-[420px] items-center justify-center sm:h-[480px]">
@@ -91,10 +91,10 @@ function ConvertStage({
             >
               <span className="absolute right-2 top-2 z-10 inline-flex items-center gap-1.5 rounded-full border border-border bg-subtle px-2.5 py-1 font-mono text-[11px] text-navy">
                 <span className="ping-live h-1.5 w-1.5 rounded-full bg-good" />
-                Live · {flying.firstName}
+                {flying.firstName}
               </span>
               <div className="flex justify-center pt-6">
-                <VoiceOrb size={240} state="speaking" />
+                <VoiceOrb size={240} state="speaking" name={flying.firstName} />
               </div>
               <SineEqualizer active className="mt-2" />
               <p className="mt-3 text-center text-[18px] font-semibold tracking-tight text-ink">
@@ -113,11 +113,9 @@ function ConvertStage({
             </p>
             <div className="mt-8 space-y-4">
               <div className="flex gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm">
-                <img
-                  src={visuals.recruiter}
-                  alt=""
-                  className="h-12 w-12 rounded-lg border border-border object-cover"
-                />
+                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-border bg-subtle font-mono text-[12px] font-medium text-steel">
+                  R
+                </span>
                 <div>
                   <p className="font-mono text-[11px] font-medium text-steel">Recruiter</p>
                   <p className="mt-1 text-[15px] text-ink">{flying.question}</p>

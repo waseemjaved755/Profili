@@ -116,7 +116,8 @@ export const finalizeCallJob = inngest.createFunction(
 export const sweepStaleCallsJob = inngest.createFunction(
   {
     id: "sweep-stale-calls",
-    triggers: [{ cron: "* * * * *" }],
+    triggers: [{ cron: "0 0,12 * * *" }],
+    retries: 0,
   },
   async ({ step }) => {
     const stale = await step.run("find-stale-calls", async () => {
