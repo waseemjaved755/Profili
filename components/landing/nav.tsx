@@ -6,10 +6,10 @@ import Link from "next/link";
 import { useState } from "react";
 
 const links = [
-  { href: "#how", label: "How it Works" },
-  { href: "#embed", label: "Embed" },
-  { href: "#insights", label: "Insights" },
-  { href: "#waitlist", label: "Waitlist" },
+  { href: "/#how", label: "How it Works" },
+  { href: "/#embed", label: "Embed" },
+  { href: "/#insights", label: "Insights" },
+  { href: "/#waitlist", label: "Waitlist" },
 ];
 
 export function LandingNav() {

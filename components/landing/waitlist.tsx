@@ -1,22 +1,23 @@
 "use client";
 
+import { WAITLIST_KEY, readConsent } from "@/lib/consent";
 import { useEffect, useState } from "react";
-
-const STORAGE_KEY = "profili-waitlist-email";
 
 export function Waitlist() {
   const [email, setEmail] = useState("");
   const [joined, setJoined] = useState(false);
 
   useEffect(() => {
-    setJoined(Boolean(window.localStorage.getItem(STORAGE_KEY)));
+    setJoined(readConsent().functional && Boolean(window.localStorage.getItem(WAITLIST_KEY)));
   }, []);
 
   function submit(event: React.FormEvent<HTMLFormElement>) {
     event.preventDefault();
     const next = email.trim().toLowerCase();
     if (!next) return;
-    window.localStorage.setItem(STORAGE_KEY, next);
+    if (readConsent().functional) {
+      window.localStorage.setItem(WAITLIST_KEY, next);
+    }
     setJoined(true);
   }
 

@@ -275,6 +275,22 @@ export function AuthCard({
             </button>
           </form>
 
+          <p className="mt-4 text-[12px] leading-relaxed text-muted">
+            By continuing you agree to the{" "}
+            <Link href="/terms" className="font-medium text-ink underline underline-offset-4">
+              Terms of Service
+            </Link>{" "}
+            and{" "}
+            <Link href="/privacy" className="font-medium text-ink underline underline-offset-4">
+              Privacy Policy
+            </Link>
+            . Cookies are explained in the{" "}
+            <Link href="/cookies" className="font-medium text-ink underline underline-offset-4">
+              Cookie Policy
+            </Link>
+            .
+          </p>
+
           <p className="mt-8 text-center text-[14px] text-muted">
             {isSignup ? (
               <>

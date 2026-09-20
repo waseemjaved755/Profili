@@ -2,14 +2,15 @@
 
 import { BrandMark, Wordmark } from "@/components/ui/wordmark";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { openConsentBanner } from "@/lib/consent";
 import { AudioLines } from "lucide-react";
 import Link from "next/link";
 
 const product = [
-  { href: "#how", label: "How it Works" },
-  { href: "#embed", label: "Embed" },
-  { href: "#insights", label: "Insights" },
-  { href: "#waitlist", label: "Waitlist" },
+  { href: "/#how", label: "How it Works" },
+  { href: "/#embed", label: "Embed" },
+  { href: "/#insights", label: "Insights" },
+  { href: "/#waitlist", label: "Waitlist" },
 ];
 
 const solutions = [
@@ -80,8 +81,9 @@ export function Footer() {
           <Col
             title="Legal"
             items={[
-              { href: "#", label: "Privacy Policy" },
-              { href: "#", label: "Terms of Service" },
+              { href: "/privacy", label: "Privacy Policy" },
+              { href: "/terms", label: "Terms of Service" },
+              { href: "/cookies", label: "Cookie Policy" },
             ]}
           />
         </div>
@@ -98,7 +100,14 @@ export function Footer() {
             <BrandMark className="h-[19px] w-4" color="#ffffff" />
             <span>Copyright © {new Date().getFullYear()} all rights reserved.</span>
           </div>
-          <p className="inline-flex items-center gap-1.5">
+          <p className="inline-flex flex-wrap items-center gap-x-3 gap-y-1.5">
+            <button
+              type="button"
+              onClick={() => openConsentBanner()}
+              className="transition-colors hover:text-white"
+            >
+              Cookie settings
+            </button>
             <ThemeToggle plain />
             <AudioLines size={14} strokeWidth={2.6} aria-hidden />
             Made to be heard
