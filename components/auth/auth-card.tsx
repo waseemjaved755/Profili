@@ -2,7 +2,8 @@
 
 import { Wordmark } from "@/components/ui/wordmark";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { useSession } from "@/lib/session";
+import { safeNextPath } from "@/lib/auth/safe-next";
+import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { VISITORS } from "@/lib/visitors";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -31,28 +32,103 @@ function GoogleMark() {
   );
 }
 
-export function AuthCard({ mode }: { mode: "login" | "signup" }) {
+function messageForError(code?: string | null) {
+  if (code === "auth_failed") {
+    return "Google sign-in did not complete. Try again.";
+  }
+  if (code === "config") {
+    return "Auth is not configured. Add your Supabase keys to .env.local.";
+  }
+  return null;
+}
+
+export function AuthCard({
+  mode,
+  error: errorParam,
+  next: nextParam,
+}: {
+  mode: "login" | "signup";
+  error?: string;
+  next?: string;
+}) {
   const isSignup = mode === "signup";
-  const { login, signup } = useSession();
   const router = useRouter();
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [busy, setBusy] = useState<"google" | "form" | null>(null);
+  const [error, setError] = useState(messageForError(errorParam));
+  const [notice, setNotice] = useState<string | null>(null);
   const faces = VISITORS.slice(0, 3);
+  const nextPath = safeNextPath(nextParam);
 
-  function go(user: { hasAgent: boolean }) {
-    router.push(isSignup || !user.hasAgent ? "/app/create" : "/app");
+  async function onGoogle() {
+    setError(null);
+    setNotice(null);
+    if (!isSupabaseConfigured()) {
+      setError(messageForError("config"));
+      return;
+    }
+    setBusy("google");
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
+      const { error: oauthError } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: { redirectTo },
+      });
+      if (oauthError) setError(oauthError.message);
+    } catch {
+      setError(messageForError("config"));
+    } finally {
+      setBusy(null);
+    }
   }
 
-  function onSubmit(e: React.FormEvent) {
+  async function onSubmit(e: React.FormEvent) {
     e.preventDefault();
-    if (isSignup) go(signup(name, email));
-    else go(login(email, name));
-  }
-
-  function onGoogle() {
-    if (isSignup) go(signup("Waseem Javed", "waseem@example.com"));
-    else go(login("waseem@example.com"));
+    setError(null);
+    setNotice(null);
+    if (!isSupabaseConfigured()) {
+      setError(messageForError("config"));
+      return;
+    }
+    setBusy("form");
+    try {
+      const { createClient } = await import("@/lib/supabase/client");
+      const supabase = createClient();
+      if (isSignup) {
+        const { data, error: signUpError } = await supabase.auth.signUp({
+          email,
+          password,
+          options: { data: { full_name: name } },
+        });
+        if (signUpError) {
+          setError(signUpError.message);
+          return;
+        }
+        if (!data.session) {
+          setNotice("Check your email to confirm your account, then sign in.");
+          return;
+        }
+      } else {
+        const { error: signInError } = await supabase.auth.signInWithPassword({
+          email,
+          password,
+        });
+        if (signInError) {
+          setError(signInError.message);
+          return;
+        }
+      }
+      router.replace(nextPath);
+      router.refresh();
+    } catch {
+      setError(messageForError("config"));
+    } finally {
+      setBusy(null);
+    }
   }
 
   return (
@@ -103,13 +179,31 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
               : "Sign in to your Profili workspace."}
           </p>
 
+          {error && (
+            <p
+              role="alert"
+              className="mt-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
+            >
+              {error}
+            </p>
+          )}
+          {notice && (
+            <p
+              role="status"
+              className="mt-5 rounded-lg border border-[#01497C]/20 bg-[#F7FAFC] px-3 py-2 text-[13px] text-ink dark:border-[#89C2D9]/30 dark:bg-[#012A4A]/30"
+            >
+              {notice}
+            </p>
+          )}
+
           <button
             type="button"
             onClick={onGoogle}
-            className="mt-8 flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border bg-surface text-[15px] font-medium text-ink transition-colors duration-150 hover:border-steel/40 hover:bg-subtle"
+            disabled={busy !== null}
+            className="mt-8 flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border bg-surface text-[15px] font-medium text-ink transition-colors duration-150 hover:border-steel/40 hover:bg-subtle disabled:opacity-60"
           >
             <GoogleMark />
-            Continue with Google
+            {busy === "google" ? "Redirecting..." : "Continue with Google"}
           </button>
 
           <div className="my-6 flex items-center gap-3">
@@ -163,15 +257,21 @@ export function AuthCard({ mode }: { mode: "login" | "signup" }) {
                 onChange={(e) => setPassword(e.target.value)}
                 placeholder="••••••••"
                 required
+                minLength={8}
                 autoComplete={isSignup ? "new-password" : "current-password"}
                 className="h-12 w-full rounded-xl border border-ink/20 bg-surface px-3 text-[15px] text-ink outline-none placeholder:text-muted/50 focus:border-cerulean"
               />
             </label>
             <button
               type="submit"
-              className="mt-2 flex h-11 w-full items-center justify-center rounded-lg bg-btn text-[15px] font-medium text-btn-fg transition-all duration-150 hover:bg-btn-hover active:scale-[0.98]"
+              disabled={busy !== null}
+              className="mt-2 flex h-11 w-full items-center justify-center rounded-lg bg-btn text-[15px] font-medium text-btn-fg transition-all duration-150 hover:bg-btn-hover active:scale-[0.98] disabled:opacity-60"
             >
-              {isSignup ? "Create account" : "Sign in"}
+              {busy === "form"
+                ? "Please wait..."
+                : isSignup
+                  ? "Create account"
+                  : "Sign in"}
             </button>
           </form>
 

@@ -1,5 +1,10 @@
 import { AuthCard } from "@/components/auth/auth-card";
 
-export default function SignupPage() {
-  return <AuthCard mode="signup" />;
+export default async function SignupPage({
+  searchParams,
+}: {
+  searchParams: Promise<{ error?: string; next?: string }>;
+}) {
+  const params = await searchParams;
+  return <AuthCard mode="signup" error={params.error} next={params.next} />;
 }
