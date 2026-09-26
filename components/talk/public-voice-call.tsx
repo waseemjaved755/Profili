@@ -4,6 +4,7 @@ import { MagneticButton } from "@/components/motion/magnetic-button";
 import { Field } from "@/components/ui/field";
 import { VoiceOrb } from "@/components/ui/voice-orb";
 import type { VoiceState } from "@/lib/motion";
+import { buildToolResult, type ToolCallEvent } from "@/lib/voice/tool-result";
 import { useEffect, useRef, useState } from "react";
 
 type SessionConfig = {
@@ -12,6 +13,22 @@ type SessionConfig = {
 };
 
 const CALL_SECONDS = 30;
+
+function BookingCard({ url }: { url: string }) {
+  return (
+    <a
+      href={url}
+      target="_blank"
+      rel="noopener noreferrer"
+      className="mt-6 block w-full max-w-md rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-steel/40 hover:bg-subtle"
+    >
+      <p className="font-mono text-[11px] font-medium tracking-wide text-[#2A6F97] uppercase dark:text-ice">
+        Book a time
+      </p>
+      <p className="mt-1 text-[15px] font-medium text-ink">Open the scheduling page</p>
+    </a>
+  );
+}
 
 export function PublicVoiceCall({
   slug,
@@ -50,6 +67,13 @@ export function PublicVoiceCall({
   const [captions, setCaptions] = useState<Array<{ speaker: "visitor" | "agent"; text: string }>>(
     [],
   );
+  const [bookingLink, setBookingLink] = useState<string | null>(null);
+
+  const pendingToolResults = useRef<Array<Promise<{ event: ToolCallEvent; result: unknown }>>>([]);
+  const lastWsEventRef = useRef<string | null>(null);
+  const sessionEndedRef = useRef(false);
+  const toolsInFlightRef = useRef(0);
+  const waitingOnToolsRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -167,9 +191,79 @@ export function PublicVoiceCall({
     }
   }
 
+  async function runToolCall(event: ToolCallEvent) {
+    const callId = callIdRef.current;
+    const transcriptToken = transcriptTokenRef.current;
+    if (!callId || !transcriptToken || !event.name) {
+      return { event, result: { ok: false, message: "Call is not active." } };
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 4000);
+    try {
+      const response = await fetch("/api/voice/tool", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          callId,
+          transcriptToken,
+          name: event.name,
+          arguments: event.arguments ?? {},
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        message?: string;
+        ui?: { type?: string; url?: string };
+        error?: string;
+      };
+      if (payload.ui?.type === "booking_link" && payload.ui.url) {
+        setBookingLink(payload.ui.url);
+      }
+      if (!response.ok) {
+        return { event, result: { ok: false, message: payload.error || payload.message || "Tool failed." } };
+      }
+      return { event, result: payload };
+    } catch {
+      return { event, result: { ok: false, message: "Tool timed out." } };
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  async function flushToolsIfIdle(ws: WebSocket) {
+    if (lastWsEventRef.current !== "reply.done") return;
+    if (!pendingToolResults.current.length) return;
+    const batch = pendingToolResults.current.splice(0, pendingToolResults.current.length);
+    const settled = await Promise.all(batch);
+    if (ws.readyState !== WebSocket.OPEN) return;
+    for (const item of settled) {
+      ws.send(JSON.stringify(buildToolResult(item.event, item.result)));
+    }
+    if (waitingOnToolsRef.current && toolsInFlightRef.current <= 0 && !pendingToolResults.current.length) {
+      waitingOnToolsRef.current = false;
+      void finish("timer");
+    }
+  }
+
+  function handleToolCall(event: ToolCallEvent, ws: WebSocket) {
+    toolsInFlightRef.current += 1;
+    const work = runToolCall(event).finally(() => {
+      toolsInFlightRef.current = Math.max(0, toolsInFlightRef.current - 1);
+    });
+    pendingToolResults.current.push(work);
+    void work.then(() => flushToolsIfIdle(ws));
+  }
+
   async function startCall() {
     setError("");
     endingRef.current = false;
+    sessionEndedRef.current = false;
+    waitingOnToolsRef.current = false;
+    pendingToolResults.current = [];
+    lastWsEventRef.current = null;
+    toolsInFlightRef.current = 0;
+    setBookingLink(null);
     setRemaining(CALL_SECONDS);
 
     try {
@@ -257,6 +351,10 @@ export function PublicVoiceCall({
           transcript?: string;
           session_id?: string;
           sessionId?: string;
+          name?: string;
+          call_id?: string;
+          tool_call_id?: string;
+          arguments?: unknown;
           turn?: { transcript?: string };
         };
         readTurn(msg);
@@ -281,22 +379,33 @@ export function PublicVoiceCall({
         } else if (msg.type === "reply.audio" && msg.data) {
           setVoice("speaking");
           playPcm(msg.data, audioCtx);
+        } else if (msg.type === "tool.call") {
+          handleToolCall(msg, ws);
+        } else if (msg.type === "reply.started" || msg.type === "input.speech.started") {
+          lastWsEventRef.current = msg.type;
         } else if (msg.type === "reply.done" && msg.status === "interrupted") {
+          lastWsEventRef.current = msg.type;
+          pendingToolResults.current = [];
           flushPlayback();
           setVoice("listening");
         } else if (msg.type === "reply.done") {
+          lastWsEventRef.current = msg.type;
           if (msg.transcript || msg.text) saveTurn("agent", msg.transcript || msg.text || "");
           setVoice("listening");
+          void flushToolsIfIdle(ws);
         } else if (msg.type === "session.ended") {
-          void finish();
+          sessionEndedRef.current = true;
+          void finish("session");
         } else if (msg.type === "session.error" || msg.type === "error") {
           setError(msg.message || "The voice session failed.");
-          void finish();
+          sessionEndedRef.current = true;
+          void finish("session");
         }
       });
 
       ws.addEventListener("close", () => {
-        void finish();
+        sessionEndedRef.current = true;
+        void finish("session");
       });
 
       setStep("call");
@@ -338,7 +447,11 @@ export function PublicVoiceCall({
     };
   }
 
-  async function finish() {
+  async function finish(reason: "user" | "timer" | "session" = "user") {
+    if (reason === "timer" && !sessionEndedRef.current && (toolsInFlightRef.current > 0 || pendingToolResults.current.length > 0)) {
+      waitingOnToolsRef.current = true;
+      return;
+    }
     if (step === "ended") return;
     await teardown(true);
     setVoice("idle");
@@ -382,7 +495,7 @@ export function PublicVoiceCall({
       setRemaining((value) => {
         if (value <= 1) {
           window.clearInterval(id);
-          void finish();
+          void finish("timer");
           return 0;
         }
         return value - 1;
@@ -397,6 +510,7 @@ export function PublicVoiceCall({
       <div className="mt-10 text-center">
         <p className="text-[22px] font-medium">Call ended.</p>
         {error && <p className="mt-3 text-[14px] text-danger">{error}</p>}
+        {bookingLink ? <BookingCard url={bookingLink} /> : null}
         <div className="mt-6">
           <MagneticButton
             onClick={() => {
@@ -435,8 +549,9 @@ export function PublicVoiceCall({
             ))}
           </ul>
         ) : null}
+        {bookingLink ? <BookingCard url={bookingLink} /> : null}
         <div className="mt-8">
-          <MagneticButton variant="secondary" onClick={() => void finish()}>
+          <MagneticButton variant="secondary" onClick={() => void finish("user")}>
             End call
           </MagneticButton>
         </div>

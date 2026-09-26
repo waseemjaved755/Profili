@@ -31,6 +31,8 @@ export type InsightCall = {
   insight_tone_label: string | null;
   insight_fit_label: string | null;
   assembly_session_id: string | null;
+  booking_link_shown_at: string | null;
+  left_message: boolean;
   transcript_turns: Turn[];
 };
 
@@ -352,10 +354,20 @@ export function InsightsDashboard() {
                                 <span className="block truncate text-[13px] font-semibold text-ink">
                                   {call.visitor_name}
                                 </span>
-                                <span className="mt-0.5 flex items-center gap-1.5">
+                                <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                   <span className="rounded-full border border-[#01497C]/12 px-1.5 py-px font-mono text-[9px] text-steel dark:border-[#89C2D9]/30">
                                     {insightBadge(call.insight_status, call.insight_intent)}
                                   </span>
+                                  {call.left_message ? (
+                                    <span className="rounded-full border border-[#01497C]/12 px-1.5 py-px font-mono text-[9px] text-[#01497C] dark:border-[#89C2D9]/30 dark:text-ice">
+                                      Left a message
+                                    </span>
+                                  ) : null}
+                                  {call.booking_link_shown_at ? (
+                                    <span className="rounded-full border border-[#01497C]/12 px-1.5 py-px font-mono text-[9px] text-[#01497C] dark:border-[#89C2D9]/30 dark:text-ice">
+                                      Booking link shown
+                                    </span>
+                                  ) : null}
                                   <span className="truncate font-mono text-[10px] text-[#61A5C2]">
                                     {timeAgo(call.started_at)}
                                   </span>

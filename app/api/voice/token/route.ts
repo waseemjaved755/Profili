@@ -108,6 +108,7 @@ export async function POST(request: Request) {
     profile: profileJson.data,
     visitorName: visitor.name,
     visitorPurpose: visitor.purpose,
+    bookingUrl: published.bookingUrl,
   });
 
   return NextResponse.json({

@@ -53,6 +53,7 @@ export const profiles = pgTable(
       .notNull()
       .default(sql`'{}'::jsonb`),
     resumePath: text("resume_path"),
+    bookingUrl: text("booking_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -90,6 +91,7 @@ export const calls = pgTable(
     insightToneLabel: text("insight_tone_label"),
     insightFitLabel: text("insight_fit_label"),
     assemblySessionId: text("assembly_session_id"),
+    bookingLinkShownAt: timestamp("booking_link_shown_at", { withTimezone: true }),
   },
   (table) => [
     index("calls_profile_started_idx").on(table.profileId, table.startedAt),
@@ -124,6 +126,30 @@ export const transcriptTurns = pgTable(
   (table) => [
     uniqueIndex("transcript_turns_call_seq").on(table.callId, table.seq),
     index("transcript_turns_call_idx").on(table.callId),
+  ],
+);
+
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    callId: uuid("call_id")
+      .notNull()
+      .unique()
+      .references(() => calls.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    intent: text("intent"),
+    visitorName: text("visitor_name").notNull(),
+    visitorEmail: text("visitor_email").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("messages_profile_created_idx").on(table.profileId, table.createdAt),
   ],
 );
 

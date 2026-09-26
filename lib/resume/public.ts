@@ -11,6 +11,7 @@ export async function getPublishedProfile(slug: string) {
       slug: profiles.slug,
       fullName: profiles.fullName,
       greeting: profiles.greeting,
+      bookingUrl: profiles.bookingUrl,
       profileJson: profiles.profileJson,
     })
     .from(profiles)
@@ -23,6 +24,7 @@ export async function getPublishedProfile(slug: string) {
     slug: row.slug,
     fullName: row.fullName,
     greeting: row.greeting,
+    bookingUrl: row.bookingUrl,
     profileJson: row.profileJson,
   };
 }

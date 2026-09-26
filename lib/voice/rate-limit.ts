@@ -3,7 +3,7 @@ import { sql } from "drizzle-orm";
 
 const LIMIT = 5;
 
-export async function takeCallSlot(kind: "email" | "ip", key: string) {
+export async function takeCallSlot(kind: "email" | "ip" | "tool-ip" | "tool-call", key: string) {
   const db = getDb();
   const rows = await db.execute(sql<{ n: number }>`
     INSERT INTO call_rate_buckets (kind, bucket_key, window_start, n)

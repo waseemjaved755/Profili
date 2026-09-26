@@ -4,6 +4,7 @@ import { Footer } from "@/components/landing/footer";
 import { HeroStory } from "@/components/landing/hero-story";
 import { LandingNav } from "@/components/landing/nav";
 import { PortfolioEmbed } from "@/components/landing/portfolio-embed";
+import { Pricing } from "@/components/landing/pricing";
 import { Steps } from "@/components/landing/steps";
 import { Waitlist } from "@/components/landing/waitlist";
 
@@ -16,6 +17,7 @@ export default function Home() {
         <Steps />
         <PortfolioEmbed />
         <Insights />
+        <Pricing />
         <Waitlist />
       </main>
       <Footer />
