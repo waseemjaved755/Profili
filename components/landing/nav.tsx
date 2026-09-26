@@ -11,6 +11,7 @@ const links = [
   { href: "/#insights", label: "Insights" },
   { href: "/#pricing", label: "Pricing" },
   { href: "/#waitlist", label: "Waitlist" },
+  { href: "/privacy", label: "Privacy" },
 ];
 
 export function LandingNav() {
