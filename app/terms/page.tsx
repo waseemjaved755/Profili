@@ -34,6 +34,7 @@ export default function TermsPage() {
         <h2>Accounts</h2>
         <ul>
           <li>You must be 16 or older.</li>
+          <li>You may sign in with email or Google. Google Sign-In is only used to identify your account.</li>
           <li>You are responsible for the resume and profile you publish.</li>
           <li>Do not upload content you do not have the right to use.</li>
           <li>Do not attempt to break rate limits, scrape other users, or impersonate someone else.</li>

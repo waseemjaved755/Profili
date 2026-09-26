@@ -10,6 +10,7 @@ const links = [
   { href: "/#embed", label: "Embed" },
   { href: "/#insights", label: "Insights" },
   { href: "/#waitlist", label: "Waitlist" },
+  { href: "/privacy", label: "Privacy" },
 ];
 
 export function LandingNav() {

@@ -205,6 +205,13 @@ export function AuthCard({
             <GoogleMark />
             {busy === "google" ? "Redirecting..." : "Continue with Google"}
           </button>
+          <p className="mt-2 text-[12px] leading-relaxed text-muted">
+            Google is used only to get your name and email so we can create or
+            open your account. We do not access Gmail or Drive.{" "}
+            <Link href="/privacy" className="font-medium text-ink underline underline-offset-4">
+              Privacy Policy
+            </Link>
+          </p>
 
           <div className="my-6 flex items-center gap-3">
             <span className="h-px flex-1 bg-ink/15" />

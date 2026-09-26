@@ -1,5 +1,5 @@
 export const LEGAL_EMAIL = "privacy@profili.fyi";
-export const LEGAL_UPDATED = "20 September 2026";
+export const LEGAL_UPDATED = "27 September 2026";
 export const CONSENT_KEY = "profili-consent";
 export const CONSENT_VERSION = 1;
 export const THEME_KEY = "profili-theme";
