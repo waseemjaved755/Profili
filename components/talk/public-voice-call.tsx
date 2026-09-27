@@ -4,6 +4,7 @@ import { MagneticButton } from "@/components/motion/magnetic-button";
 import { Field } from "@/components/ui/field";
 import { VoiceOrb } from "@/components/ui/voice-orb";
 import type { VoiceState } from "@/lib/motion";
+import { CALL_SECONDS, formatCallClock } from "@/lib/voice/call-window";
 import { buildToolResult, type ToolCallEvent } from "@/lib/voice/tool-result";
 import { useEffect, useRef, useState } from "react";
 
@@ -11,24 +12,6 @@ type SessionConfig = {
   type: "session.update";
   session: Record<string, unknown>;
 };
-
-const CALL_SECONDS = 30;
-
-function BookingCard({ url }: { url: string }) {
-  return (
-    <a
-      href={url}
-      target="_blank"
-      rel="noopener noreferrer"
-      className="mt-6 block w-full max-w-md rounded-xl border border-border bg-surface p-4 text-left transition-colors hover:border-steel/40 hover:bg-subtle"
-    >
-      <p className="font-mono text-[11px] font-medium tracking-wide text-[#2A6F97] uppercase dark:text-ice">
-        Book a time
-      </p>
-      <p className="mt-1 text-[15px] font-medium text-ink">Open the scheduling page</p>
-    </a>
-  );
-}
 
 export function PublicVoiceCall({
   slug,
@@ -67,7 +50,7 @@ export function PublicVoiceCall({
   const [captions, setCaptions] = useState<Array<{ speaker: "visitor" | "agent"; text: string }>>(
     [],
   );
-  const [bookingLink, setBookingLink] = useState<string | null>(null);
+  const [bargeInFlash, setBargeInFlash] = useState(false);
 
   const pendingToolResults = useRef<Array<Promise<{ event: ToolCallEvent; result: unknown }>>>([]);
   const lastWsEventRef = useRef<string | null>(null);
@@ -102,6 +85,11 @@ export function PublicVoiceCall({
       window.removeEventListener("beforeunload", beaconEnd);
     };
   }, []);
+
+  function markBargeIn() {
+    setBargeInFlash(true);
+    window.setTimeout(() => setBargeInFlash(false), 2800);
+  }
 
   function flushPlayback() {
     sourcesRef.current.forEach((source) => {
@@ -163,7 +151,7 @@ export function PublicVoiceCall({
     setCaptions((current) => {
       const last = current[current.length - 1];
       if (last && last.speaker === speaker && last.text === trimmed) return current;
-      return [...current, { speaker, text: trimmed }].slice(-8);
+      return [...current, { speaker, text: trimmed }].slice(-20);
     });
     const seq = seqRef.current;
     seqRef.current += 1;
@@ -214,12 +202,8 @@ export function PublicVoiceCall({
       const payload = (await response.json().catch(() => ({}))) as {
         ok?: boolean;
         message?: string;
-        ui?: { type?: string; url?: string };
         error?: string;
       };
-      if (payload.ui?.type === "booking_link" && payload.ui.url) {
-        setBookingLink(payload.ui.url);
-      }
       if (!response.ok) {
         return { event, result: { ok: false, message: payload.error || payload.message || "Tool failed." } };
       }
@@ -263,7 +247,7 @@ export function PublicVoiceCall({
     pendingToolResults.current = [];
     lastWsEventRef.current = null;
     toolsInFlightRef.current = 0;
-    setBookingLink(null);
+    setBargeInFlash(false);
     setRemaining(CALL_SECONDS);
 
     try {
@@ -381,13 +365,21 @@ export function PublicVoiceCall({
           playPcm(msg.data, audioCtx);
         } else if (msg.type === "tool.call") {
           handleToolCall(msg, ws);
-        } else if (msg.type === "reply.started" || msg.type === "input.speech.started") {
+        } else if (msg.type === "input.speech.started") {
+          lastWsEventRef.current = msg.type;
+          if (voiceRef.current === "speaking") {
+            flushPlayback();
+            setVoice("listening");
+            markBargeIn();
+          }
+        } else if (msg.type === "reply.started") {
           lastWsEventRef.current = msg.type;
         } else if (msg.type === "reply.done" && msg.status === "interrupted") {
           lastWsEventRef.current = msg.type;
           pendingToolResults.current = [];
           flushPlayback();
           setVoice("listening");
+          markBargeIn();
         } else if (msg.type === "reply.done") {
           lastWsEventRef.current = msg.type;
           if (msg.transcript || msg.text) saveTurn("agent", msg.transcript || msg.text || "");
@@ -510,7 +502,6 @@ export function PublicVoiceCall({
       <div className="mt-10 text-center">
         <p className="text-[22px] font-medium">Call ended.</p>
         {error && <p className="mt-3 text-[14px] text-danger">{error}</p>}
-        {bookingLink ? <BookingCard url={bookingLink} /> : null}
         <div className="mt-6">
           <MagneticButton
             onClick={() => {
@@ -537,8 +528,18 @@ export function PublicVoiceCall({
           level={level}
           name={fullName.split(" ")[0] || "Voice agent"}
         />
-        <p className="mt-6 font-mono text-[28px] tabular-nums">{remaining}s</p>
+        <p className="mt-6 font-mono text-[28px] tabular-nums">{formatCallClock(remaining)}</p>
         <p className="mt-2 text-[15px] text-muted">{indicator}</p>
+        {voice === "speaking" ? (
+          <p className="mt-2 max-w-sm text-[13px] text-ink">
+            Talk over them to cut them off. Watch the voice stop mid-sentence.
+          </p>
+        ) : null}
+        {bargeInFlash ? (
+          <p className="mt-2 rounded-full border border-border bg-subtle px-3 py-1 font-mono text-[12px] text-navy">
+            Interrupted · reply.done
+          </p>
+        ) : null}
         {captions.length > 0 ? (
           <ul className="mt-6 w-full max-w-md space-y-2 text-left text-[13px]">
             {captions.map((line, index) => (
@@ -549,7 +550,6 @@ export function PublicVoiceCall({
             ))}
           </ul>
         ) : null}
-        {bookingLink ? <BookingCard url={bookingLink} /> : null}
         <div className="mt-8">
           <MagneticButton variant="secondary" onClick={() => void finish("user")}>
             End call
@@ -568,7 +568,7 @@ export function PublicVoiceCall({
       }}
     >
       <p className="text-center text-[15px] text-muted">
-        You&apos;re talking to an AI. Calls are limited to 30 seconds and may be recorded.
+        You&apos;re talking to an AI. Talk over it to interrupt. Calls last 5 minutes and may be recorded.
       </p>
       <Field
         label="Name"

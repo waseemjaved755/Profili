@@ -5,7 +5,7 @@ Turn a resume into a public voice agent. Recruiters and visitors talk to the pub
 **Live site:** [profili.fyi](https://profili.fyi)
 
 ```text
-PDF  →  Gemini profile  →  share /p/{slug}  →  AssemblyAI call  →  insights
+PDF  →  Gemini profile  →  share /participant/{slug}  →  AssemblyAI call  →  insights
               ▲                                         ▲
          Inngest parse                             Inngest finalize
 ```
@@ -15,7 +15,7 @@ PDF  →  Gemini profile  →  share /p/{slug}  →  AssemblyAI call  →  insig
 1. Sign in with email or Google (Supabase Auth).
 2. Upload a resume PDF. Parsing runs in the background so the upload request stays fast.
 3. Review the extracted profile, pick a voice, publish a slug.
-4. Share `https://profili.fyi/p/{slug}` or embed the same page.
+4. Share `https://profili.fyi/participant/{slug}` or embed the same page.
 5. Visitors start a short live call. The agent answers from the published `profile_json`, not a fresh LLM pass per question.
 6. After hangup, AssemblyAI’s session timeline is the source of truth. Gemini writes insights for the owner dashboard.
 
@@ -75,7 +75,7 @@ Never commit `.env.local`. Never ship the service role key to the browser.
 | `/app/create` | Owner | Upload resume |
 | `/app/review` | Owner | Edit extracted profile |
 | `/app/dashboard` | Owner | Calls and insights |
-| `/p/{slug}` | Public | Talk to the published agent |
+| `/participant/{slug}` | Public | Talk to the published agent |
 | `/api/inngest` | Inngest | Serve functions (GET / POST / PUT) |
 
 ## Scripts
@@ -193,7 +193,7 @@ Voice context is the **published** `profile_json`. Gemini is not on the hot path
 ```mermaid
 sequenceDiagram
   participant Visitor
-  participant Page as GET /p/{slug}
+  participant Page as GET /participant/{slug}
   participant Token as POST /api/voice/token
   participant AAI as AssemblyAI
   participant Session as POST /api/voice/session

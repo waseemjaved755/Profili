@@ -37,7 +37,7 @@ export const profileJsonSchema = z.object({
   education: z.array(educationSchema).max(20),
   skills: z.array(z.string().max(80)).max(80),
   projects: z.array(projectSchema).max(30),
-  voice: z.string().min(1).max(40).default("Alex"),
+  voice: z.string().min(1).max(40).default("alba"),
   personality: personalitySchema.default("professional"),
   formality: z.number().min(0).max(1).default(0.3),
   verbosity: z.number().min(0).max(1).default(0.5),
@@ -113,8 +113,8 @@ export const voiceTranscriptBodySchema = z.object({
   callId: z.string().uuid(),
   transcriptToken: z.string().uuid(),
   speaker: z.enum(["visitor", "agent"]),
-  text: z.string().trim().min(1).max(4000),
-  seq: z.number().int().min(0).max(500),
+  text: z.string().trim().min(1).max(8000),
+  seq: z.number().int().min(0).max(4000),
 });
 
 export function defaultGreeting(fullName: string) {
@@ -139,7 +139,7 @@ export function buildStoredProfile(
   return profileJsonSchema.parse({
     education: current.education ?? [],
     projects: current.projects ?? [],
-    voice: current.voice ?? "Alex",
+    voice: current.voice ?? "alba",
     personality: current.personality ?? "professional",
     formality: current.formality ?? 0.3,
     verbosity: current.verbosity ?? 0.5,

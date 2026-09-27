@@ -11,7 +11,7 @@
 
     node.setAttribute("data-profili-ready", "1");
     const iframe = document.createElement("iframe");
-    iframe.src = `${origin}/p/${encodeURIComponent(slug)}?embed=1`;
+    iframe.src = `${origin}/participant/${encodeURIComponent(slug)}?embed=1`;
     iframe.title = "Profili voice agent";
     iframe.allow = "microphone; autoplay";
     iframe.style.width = "100%";

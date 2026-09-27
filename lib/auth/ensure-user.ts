@@ -18,7 +18,7 @@ export async function ensureAppUser(supabase: SupabaseClient, user: User) {
   const { error } = await supabase.from("users").upsert(
     {
       id: user.id,
-      email: user.email ?? "",
+      email: (user.email ?? "").trim().toLowerCase(),
       full_name: displayName(user),
       avatar_url: avatarUrl(user),
     },

@@ -49,9 +49,9 @@ export const plans: Plan[] = [
     features: [
       "60 talk-minutes a month",
       "Calls up to 2 minutes",
-      "Insights dashboard with transcripts and recordings",
+      "Insights dashboard with transcripts",
       "Embed on your site",
-      "Leave-a-message and booking link",
+      "Leave-a-message included",
       "No Profili badge",
       "Email alerts for new visitors",
     ],

@@ -1,5 +1,7 @@
+import { PASSWORD_RESET_COOKIE } from "@/lib/auth/reset-cookie";
 import { createServerClient } from "@supabase/ssr";
 import { NextResponse, type NextRequest } from "next/server";
+import { supabaseCookieOptions, supabaseCookieSecureFromRequest } from "./cookie-options";
 import { getSupabasePublicEnv, isSupabaseConfigured } from "./env";
 
 function applyAuthCookies(
@@ -21,10 +23,17 @@ export async function updateSession(request: NextRequest) {
     return NextResponse.next({ request });
   }
 
+  // PKCE verifiers live in cookies. getUser() on this path can treat a stale
+  // session as invalid and wipe those cookies before the code is exchanged.
+  if (request.nextUrl.pathname === "/auth/callback" || request.nextUrl.pathname === "/auth/confirm") {
+    return NextResponse.next({ request });
+  }
+
   const { url, anonKey } = getSupabasePublicEnv();
   let supabaseResponse = NextResponse.next({ request });
 
   const supabase = createServerClient(url, anonKey, {
+    cookieOptions: supabaseCookieOptions(supabaseCookieSecureFromRequest(request)),
     cookies: {
       getAll() {
         return request.cookies.getAll();
@@ -50,7 +59,9 @@ export async function updateSession(request: NextRequest) {
 
   const path = request.nextUrl.pathname;
   const isApp = path === "/app" || path.startsWith("/app/");
-  const isAuthPage = path === "/login" || path === "/signup";
+  const isAuthForm = path === "/login" || path === "/signup" || path === "/forgot";
+  const isPasswordReset = path === "/reset-password";
+  const hasResetCookie = request.cookies.get(PASSWORD_RESET_COOKIE)?.value === "1";
 
   if (isApp && !user) {
     const redirectUrl = request.nextUrl.clone();
@@ -60,7 +71,14 @@ export async function updateSession(request: NextRequest) {
     return applyAuthCookies(supabaseResponse, NextResponse.redirect(redirectUrl));
   }
 
-  if (isAuthPage && user) {
+  if (isPasswordReset && !hasResetCookie) {
+    const redirectUrl = request.nextUrl.clone();
+    redirectUrl.pathname = user ? "/app" : "/forgot";
+    redirectUrl.search = "";
+    return applyAuthCookies(supabaseResponse, NextResponse.redirect(redirectUrl));
+  }
+
+  if (isAuthForm && user) {
     const redirectUrl = request.nextUrl.clone();
     redirectUrl.pathname = "/app";
     redirectUrl.search = "";

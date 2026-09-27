@@ -13,7 +13,12 @@ export function AuthGate({ children }: { children: React.ReactNode }) {
   }, [ready, user, router]);
 
   if (!ready || !user) {
-    return <div className="min-h-[50vh]" />;
+    return (
+      <div className="flex min-h-[50vh] flex-col items-center justify-center px-6 text-center">
+        <p className="font-mono text-[11px] tracking-wide text-muted uppercase">Workspace</p>
+        <p className="mt-2 text-[15px] text-ink">Loading your account…</p>
+      </div>
+    );
   }
 
   return <>{children}</>;

@@ -134,7 +134,7 @@ function ResumeStack({
         </span>
       </motion.div>
       <p className="mt-3 text-center font-mono text-[11px] text-steel">
-        Hover to spread · click a résumé to hear {flying.firstName}
+        Click a résumé to hear {flying.firstName}
       </p>
     </div>
   );

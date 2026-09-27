@@ -236,7 +236,7 @@ export function PortfolioEmbed() {
                         aria-selected={selected}
                         tabIndex={selected ? 0 : -1}
                         onClick={() => setTab(id)}
-                        className={`relative z-10 min-w-18 rounded-md px-3 py-1.5 text-[12px] font-medium ${
+                        className={`relative z-10 min-w-18 cursor-pointer rounded-md px-3 py-1.5 text-[12px] font-medium ${
                           selected ? "text-ink" : "text-muted"
                         }`}
                       >
@@ -269,7 +269,7 @@ export function PortfolioEmbed() {
                   <button
                     type="button"
                     onClick={() => void copyCode()}
-                    className="absolute right-2 top-2 z-10 inline-flex items-center gap-1.5 rounded-lg border border-white/15 bg-white/8 px-2.5 py-1.5 font-mono text-[11px] font-medium text-[#89C2D9] transition-colors duration-150 hover:border-white/30 hover:bg-white/12"
+                    className="absolute right-2 top-2 z-10 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 bg-white/8 px-2.5 py-1.5 font-mono text-[11px] font-medium text-[#89C2D9] transition-colors duration-150 hover:border-white/30 hover:bg-white/12"
                   >
                     {copied ? <Check size={12} strokeWidth={2.4} /> : <Copy size={12} strokeWidth={2.4} />}
                     {copied ? "Copied" : "Copy"}

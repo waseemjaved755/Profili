@@ -8,7 +8,6 @@ import {
   parseToolArguments,
   toolRequestSchema,
 } from "@/lib/voice/tool-args";
-import { isHttpsUrl } from "@/lib/voice/tools";
 import { and, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
 
@@ -62,66 +61,52 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, message: "Invalid tool arguments." });
   }
 
-  if (parsed.data.name === "leave_message_for_owner") {
-    const body = leaveMessageArgsSchema.safeParse(args);
-    if (!body.success) {
-      return NextResponse.json({
-        ok: false,
-        message: body.error.issues[0]?.message || "Could not save that message.",
-      });
-    }
-
-    const [owner] = await db
-      .select({ fullName: profiles.fullName })
-      .from(profiles)
-      .where(eq(profiles.id, call.profileId))
-      .limit(1);
-    const firstName = (owner?.fullName || "They").split(/\s+/).filter(Boolean)[0] || "They";
-
-    try {
-      const [row] = await db
-        .insert(messages)
-        .values({
-          callId: call.id,
-          profileId: call.profileId,
-          body: body.data.message,
-          intent: body.data.intent ?? null,
-          visitorName: call.visitorName,
-          visitorEmail: call.visitorEmail,
-        })
-        .returning({ id: messages.id });
-
-      if (row) {
-        void notifyOwnerOfMessage(row.id).catch((error) => {
-          console.error(JSON.stringify({ msg: "message.notify_enqueue_failed", messageId: row.id, error: String(error) }));
-        });
-      }
-      return NextResponse.json({
-        ok: true,
-        message: `Saved. ${firstName} will get it by email.`,
-      });
-    } catch (error) {
-      const code = typeof error === "object" && error && "code" in error ? String((error as { code?: string }).code) : "";
-      if (code === "23505") {
-        return NextResponse.json({ ok: false, message: "already sent" });
-      }
-      throw error;
-    }
+  if (parsed.data.name !== "leave_message_for_owner") {
+    return NextResponse.json({ ok: false, message: "Unknown tool." });
   }
 
-  const [profile] = await db
-    .select({ bookingUrl: profiles.bookingUrl, fullName: profiles.fullName })
+  const body = leaveMessageArgsSchema.safeParse(args);
+  if (!body.success) {
+    return NextResponse.json({
+      ok: false,
+      message: body.error.issues[0]?.message || "Could not save that message.",
+    });
+  }
+
+  const [owner] = await db
+    .select({ fullName: profiles.fullName })
     .from(profiles)
     .where(eq(profiles.id, call.profileId))
     .limit(1);
-  const url = profile?.bookingUrl?.trim() ?? "";
-  if (!url || !isHttpsUrl(url)) {
-    return NextResponse.json({ ok: false, message: "No booking link is available." });
-  }
+  const firstName = (owner?.fullName || "They").split(/\s+/).filter(Boolean)[0] || "They";
 
-  await db.update(calls).set({ bookingLinkShownAt: new Date() }).where(eq(calls.id, call.id));
-  return NextResponse.json({
-    ok: true,
-    ui: { type: "booking_link", url },
-  });
+  try {
+    const [row] = await db
+      .insert(messages)
+      .values({
+        callId: call.id,
+        profileId: call.profileId,
+        body: body.data.message,
+        intent: body.data.intent ?? null,
+        visitorName: call.visitorName,
+        visitorEmail: call.visitorEmail,
+      })
+      .returning({ id: messages.id });
+
+    if (row) {
+      void notifyOwnerOfMessage(row.id).catch((error) => {
+        console.error(JSON.stringify({ msg: "message.notify_enqueue_failed", messageId: row.id, error: String(error) }));
+      });
+    }
+    return NextResponse.json({
+      ok: true,
+      message: `Saved. ${firstName} will get it by email.`,
+    });
+  } catch (error) {
+    const code = typeof error === "object" && error && "code" in error ? String((error as { code?: string }).code) : "";
+    if (code === "23505") {
+      return NextResponse.json({ ok: false, message: "already sent" });
+    }
+    throw error;
+  }
 }

@@ -108,8 +108,8 @@ function ConvertStage({
             <p className="label">Now speaking</p>
             <h2 className="mt-3 text-[36px] font-semibold tracking-tight text-ink sm:text-[52px]">{flying.name}</h2>
             <p className="mt-4 max-w-xl text-[16px] text-muted">
-              The résumé becomes a voice you can hear, grounded in the page,
-              ready when a recruiter asks.
+              The résumé becomes a voice you can hear, grounded in the page.
+              Talk over it and it stops. That interrupt is the hard part.
             </p>
             <div className="mt-8 space-y-4">
               <div className="flex gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm">

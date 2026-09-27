@@ -171,6 +171,23 @@ h3 {
   outline-offset: 2px;
 }
 
+a,
+button,
+summary,
+label,
+[role="button"],
+[role="tab"],
+[role="radio"],
+[role="switch"],
+select {
+  cursor: pointer;
+}
+
+button:disabled,
+[aria-disabled="true"] {
+  cursor: not-allowed;
+}
+
 .font-heading {
   font-family: var(--font-heading);
 }

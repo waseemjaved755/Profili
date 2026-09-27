@@ -12,7 +12,7 @@ Examples of variety: Recruiter screen, Peer deep-dive, Founder intro, Customer q
 Scores are 0-100 integers.
 citation is a short pointer to resume material the agent used, or "Spoken only" if nothing mapped.
 query is the visitor's main question in one sentence.
-summary is what they asked and how the agent answered, grounded in the transcript.`;
+summary is 2 to 4 sentences covering the main questions and how the agent answered, grounded in the transcript. Do not quote the whole call.`;
 
 const RESPONSE_SCHEMA = {
   type: "OBJECT",
@@ -152,7 +152,7 @@ export async function generateCallInsights(callId: string) {
   const transcript = spoken
     .map((turn) => `${turn.speaker === "visitor" ? "Visitor" : "Agent"}: ${turn.text}`)
     .join("\n")
-    .slice(0, 12000);
+    .slice(0, 48000);
 
   const models = modelList();
   let lastError = "Insights model failed.";

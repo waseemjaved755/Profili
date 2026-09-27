@@ -4,8 +4,8 @@ import { buildToolResult } from "./tool-result.ts";
 
 test("tool.result uses call_id and a JSON string result", () => {
   const message = buildToolResult(
-    { type: "tool.call", call_id: "call_abc", name: "share_booking_link" },
-    { ok: true, ui: { type: "booking_link", url: "https://cal.com/x" } },
+    { type: "tool.call", call_id: "call_abc", name: "leave_message_for_owner" },
+    { ok: true, message: "Saved." },
   );
   assert.equal(message.type, "tool.result");
   assert.equal(message.call_id, "call_abc");

@@ -13,9 +13,10 @@
     "db:studio": "drizzle-kit studio",
     "inngest:dev": "pnpm dlx inngest-cli@latest dev -u http://localhost:3000/api/inngest",
     "icons": "node scripts/generate-icons.mjs",
-    "test": "node --experimental-strip-types --test lib/voice/tools.test.ts lib/voice/tool-result.test.ts"
+    "test": "node --experimental-strip-types --test lib/voice/tools.test.ts lib/voice/tool-result.test.ts lib/voice/assembly-voices.test.ts lib/auth/safe-next.test.ts lib/auth/account-providers.test.ts lib/supabase/cookie-options.test.ts"
   },
   "dependencies": {
+    "@hookform/resolvers": "^5.9.1",
     "@supabase/ssr": "^0.12.7",
     "@supabase/supabase-js": "^2.116.0",
     "drizzle-orm": "^0.45.2",
@@ -28,6 +29,7 @@
     "postgres": "^3.4.9",
     "react": "19.2.8",
     "react-dom": "19.2.8",
+    "react-hook-form": "^7.89.0",
     "sharp": "^0.35.4",
     "unpdf": "^1.8.1",
     "zod": "^4.6.5"

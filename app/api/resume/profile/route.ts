@@ -13,7 +13,7 @@ export async function GET() {
 
   const { data, error } = await auth.supabase
     .from("profiles")
-    .select("id, user_id, slug, status, parse_status, parse_error, full_name, greeting, profile_json, resume_path, booking_url")
+    .select("id, user_id, slug, status, parse_status, parse_error, full_name, greeting, profile_json, resume_path")
     .eq("user_id", auth.user.id)
     .maybeSingle();
 

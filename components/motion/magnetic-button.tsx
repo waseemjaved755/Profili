@@ -14,7 +14,7 @@ const styles: Record<Variant, string> = {
 };
 
 const base =
-  "relative inline-flex min-h-11 items-center justify-center gap-2 rounded-lg px-5 text-sm font-medium shadow-sm transition-all duration-150 active:scale-[0.98]";
+  "relative inline-flex min-h-11 cursor-pointer items-center justify-center gap-2 rounded-lg px-5 text-sm font-medium shadow-sm transition-all duration-150 active:scale-[0.98]";
 
 export function MagneticButton({
   children,

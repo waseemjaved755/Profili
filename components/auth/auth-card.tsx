@@ -1,13 +1,20 @@
 "use client";
 
-import { Wordmark } from "@/components/ui/wordmark";
-import { ThemeToggle } from "@/components/ui/theme-toggle";
+import { AuthField } from "@/components/auth/auth-field";
+import { AuthShell } from "@/components/auth/auth-shell";
+import {
+  googleOnlySignupMessage,
+  signupShouldResendConfirmation,
+} from "@/lib/auth/account-providers";
+import { authCallbackUrl, authConfirmUrl } from "@/lib/auth/email-redirect";
 import { safeNextPath } from "@/lib/auth/safe-next";
+import { authFormSchema, type AuthFormValues } from "@/lib/auth/schemas";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
-import { VISITORS } from "@/lib/visitors";
+import { zodResolver } from "@hookform/resolvers/zod";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useForm } from "react-hook-form";
 
 function GoogleMark() {
   return (
@@ -34,12 +41,42 @@ function GoogleMark() {
 
 function messageForError(code?: string | null) {
   if (code === "auth_failed") {
-    return "Google sign-in did not complete. Try again.";
+    return "Could not finish sign-in from that link. If you signed up with email, sign in with your password.";
+  }
+  if (code === "expired") {
+    return "This email link was already used or expired. If you already confirmed, sign in with your password.";
+  }
+  if (code === "denied") {
+    return "Sign-in was cancelled. Try again when you are ready.";
   }
   if (code === "config") {
     return "Auth is not configured. Add your Supabase keys to .env.local.";
   }
   return null;
+}
+
+function noticeForParam(code?: string | null) {
+  if (code === "confirm_login") {
+    return "Your email is confirmed. Sign in with your password.";
+  }
+  return null;
+}
+
+function friendlyAuthError(message: string) {
+  const lower = message.toLowerCase();
+  if (lower.includes("rate limit") || lower.includes("email rate")) {
+    return "Too many emails just now. Wait a minute and try again.";
+  }
+  if (lower.includes("already registered") || lower.includes("already been registered")) {
+    return "That email already has an account. If you used Google, continue with Google.";
+  }
+  if (lower.includes("invalid login")) {
+    return "Email or password is wrong. If you signed up with Google, use Continue with Google.";
+  }
+  if (lower.includes("email not confirmed")) {
+    return "Confirm your email first. Check your inbox for the Profili link.";
+  }
+  return message;
 }
 
 export function AuthCard({
@@ -53,14 +90,24 @@ export function AuthCard({
 }) {
   const isSignup = mode === "signup";
   const router = useRouter();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [password, setPassword] = useState("");
   const [busy, setBusy] = useState<"google" | "form" | null>(null);
   const [error, setError] = useState(messageForError(errorParam));
-  const [notice, setNotice] = useState<string | null>(null);
-  const faces = VISITORS.slice(0, 3);
+  const [notice, setNotice] = useState(noticeForParam(errorParam));
   const nextPath = safeNextPath(nextParam);
+  const form = useForm<AuthFormValues>({
+    resolver: zodResolver(authFormSchema(isSignup)),
+    defaultValues: { name: "", email: "", password: "" },
+  });
+
+  async function emailIsGoogleOnly(value: string) {
+    const response = await fetch("/api/auth/email-account", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email: value }),
+    });
+    const payload = (await response.json().catch(() => ({}))) as { googleOnly?: boolean };
+    return Boolean(payload.googleOnly);
+  }
 
   async function onGoogle() {
     setError(null);
@@ -73,12 +120,11 @@ export function AuthCard({
     try {
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
-      const redirectTo = `${window.location.origin}/auth/callback?next=${encodeURIComponent(nextPath)}`;
       const { error: oauthError } = await supabase.auth.signInWithOAuth({
         provider: "google",
-        options: { redirectTo },
+        options: { redirectTo: authCallbackUrl(nextPath) },
       });
-      if (oauthError) setError(oauthError.message);
+      if (oauthError) setError(friendlyAuthError(oauthError.message));
     } catch {
       setError(messageForError("config"));
     } finally {
@@ -86,8 +132,7 @@ export function AuthCard({
     }
   }
 
-  async function onSubmit(e: React.FormEvent) {
-    e.preventDefault();
+  async function onSubmit(values: AuthFormValues) {
     setError(null);
     setNotice(null);
     if (!isSupabaseConfigured()) {
@@ -96,29 +141,82 @@ export function AuthCard({
     }
     setBusy("form");
     try {
+      if (await emailIsGoogleOnly(values.email)) {
+        setError(googleOnlySignupMessage());
+        return;
+      }
       const { createClient } = await import("@/lib/supabase/client");
       const supabase = createClient();
+      const confirmRedirect = authConfirmUrl(nextPath);
+
+      async function resendSignupMail(email: string) {
+        return supabase.auth.resend({
+          type: "signup",
+          email,
+          options: { emailRedirectTo: confirmRedirect },
+        });
+      }
+
       if (isSignup) {
         const { data, error: signUpError } = await supabase.auth.signUp({
-          email,
-          password,
-          options: { data: { full_name: name } },
+          email: values.email,
+          password: values.password,
+          options: {
+            data: { full_name: values.name ?? "" },
+            emailRedirectTo: confirmRedirect,
+          },
         });
+        const verdict = signupShouldResendConfirmation({
+          user: data.user,
+          errorMessage: signUpError?.message,
+        });
+        if (verdict === "google_only") {
+          setError(googleOnlySignupMessage());
+          return;
+        }
+        if (verdict === "resend") {
+          const { error: resendError } = await resendSignupMail(values.email);
+          if (resendError) {
+            if (/rate limit|email rate/i.test(resendError.message)) {
+              setError(friendlyAuthError(resendError.message));
+              return;
+            }
+            setError(
+              "That email already has an account. Sign in with your password, or reset it if you already confirmed.",
+            );
+            return;
+          }
+          setNotice(
+            "We sent another confirmation link. Open it, tap Confirm email, then sign in with the password from your first signup. Check spam if it is not there in a minute.",
+          );
+          return;
+        }
         if (signUpError) {
-          setError(signUpError.message);
+          setError(friendlyAuthError(signUpError.message));
           return;
         }
         if (!data.session) {
-          setNotice("Check your email to confirm your account, then sign in.");
+          setNotice(
+            "We sent a confirmation link. Open it, tap Confirm email, then sign in here with your password. Check spam if it is not there in a minute.",
+          );
           return;
         }
       } else {
         const { error: signInError } = await supabase.auth.signInWithPassword({
-          email,
-          password,
+          email: values.email,
+          password: values.password,
         });
         if (signInError) {
-          setError(signInError.message);
+          if (/email not confirmed/i.test(signInError.message)) {
+            const { error: resendError } = await resendSignupMail(values.email);
+            if (!resendError) {
+              setNotice(
+                "This address is not confirmed yet. We sent a new confirmation link. Open it, tap Confirm email, then sign in with the same password.",
+              );
+              return;
+            }
+          }
+          setError(friendlyAuthError(signInError.message));
           return;
         }
       }
@@ -132,191 +230,143 @@ export function AuthCard({
   }
 
   return (
-    <div className="grid min-h-dvh lg:grid-cols-2">
-      <aside className="relative flex min-h-[280px] flex-col justify-between overflow-hidden bg-deep px-8 py-8 text-white sm:px-10 lg:min-h-full lg:px-12 lg:py-10">
-        <div
-          aria-hidden
-          className="absolute inset-0"
-          style={{
-            background:
-              "linear-gradient(165deg, #012A4A 0%, #013A63 28%, #01497C 55%, #2C7DA0 82%, #61A5C2 100%)",
-          }}
-        />
-        <Wordmark tone="onDark" className="relative z-10" />
-        <div className="relative z-10 mt-16 max-w-md lg:mt-0">
-          <h2 className="text-[36px] font-semibold leading-[1.1] tracking-tight text-white sm:text-[44px]">
-            Your experience, spoken in real time.
-          </h2>
-          <div className="mt-6 flex items-center gap-3">
-            <div className="flex -space-x-3">
-              {faces.map((face) => (
-                <img
-                  key={face.id}
-                  src={face.src}
-                  alt=""
-                  className="h-9 w-9 rounded-full border-2 border-white object-cover"
-                />
-              ))}
-            </div>
-            <p className="text-[13px] font-medium text-white/80">
-              Join 120+ conversations on Profili
-            </p>
-          </div>
-        </div>
-      </aside>
+    <AuthShell>
+      <h1 className="text-[32px] font-semibold tracking-tight text-ink">
+        {isSignup ? "Create your AI" : "Welcome back"}
+      </h1>
+      <p className="mt-2 text-[15px] text-muted">
+        {isSignup
+          ? "Upload your experience. Choose your voice. Start talking."
+          : "Sign in to your Profili workspace."}
+      </p>
 
-      <div className="relative flex items-center justify-center bg-surface px-5 py-12 sm:px-8">
-        <div className="absolute right-5 top-5 sm:right-8 sm:top-8">
-          <ThemeToggle />
-        </div>
-        <div className="w-full max-w-[400px]">
-          <h1 className="text-[32px] font-semibold tracking-tight text-ink">
-            {isSignup ? "Create your AI" : "Welcome back"}
-          </h1>
-          <p className="mt-2 text-[15px] text-muted">
-            {isSignup
-              ? "Upload your experience. Choose your voice. Start talking."
-              : "Sign in to your Profili workspace."}
-          </p>
+      {error && (
+        <p
+          role="alert"
+          className="mt-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
+        >
+          {error}
+        </p>
+      )}
+      {notice && (
+        <p
+          role="status"
+          className="mt-5 rounded-lg border border-[#01497C]/20 bg-[#F7FAFC] px-3 py-2 text-[13px] text-ink dark:border-[#89C2D9]/30 dark:bg-[#012A4A]/30"
+        >
+          {notice}
+        </p>
+      )}
 
-          {error && (
-            <p
-              role="alert"
-              className="mt-5 rounded-lg border border-red-200 bg-red-50 px-3 py-2 text-[13px] text-red-800 dark:border-red-900/60 dark:bg-red-950/40 dark:text-red-200"
-            >
-              {error}
-            </p>
-          )}
-          {notice && (
-            <p
-              role="status"
-              className="mt-5 rounded-lg border border-[#01497C]/20 bg-[#F7FAFC] px-3 py-2 text-[13px] text-ink dark:border-[#89C2D9]/30 dark:bg-[#012A4A]/30"
-            >
-              {notice}
-            </p>
-          )}
+      <button
+        type="button"
+        onClick={onGoogle}
+        disabled={busy !== null}
+        className="mt-8 flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border bg-surface text-[15px] font-medium text-ink transition-colors duration-150 hover:border-steel/40 hover:bg-subtle disabled:opacity-60"
+      >
+        <GoogleMark />
+        {busy === "google" ? "Redirecting..." : "Continue with Google"}
+      </button>
+      <p className="mt-2 text-[12px] leading-relaxed text-muted">
+        Google is used only to get your name and email so we can create or open your account. We do not
+        access Gmail or Drive.{" "}
+        <Link href="/privacy" className="font-medium text-ink underline underline-offset-4">
+          Privacy Policy
+        </Link>
+      </p>
 
-          <button
-            type="button"
-            onClick={onGoogle}
-            disabled={busy !== null}
-            className="mt-8 flex h-11 w-full items-center justify-center gap-2.5 rounded-lg border border-border bg-surface text-[15px] font-medium text-ink transition-colors duration-150 hover:border-steel/40 hover:bg-subtle disabled:opacity-60"
-          >
-            <GoogleMark />
-            {busy === "google" ? "Redirecting..." : "Continue with Google"}
-          </button>
-          <p className="mt-2 text-[12px] leading-relaxed text-muted">
-            Google is used only to get your name and email so we can create or
-            open your account. We do not access Gmail or Drive.{" "}
-            <Link href="/privacy" className="font-medium text-ink underline underline-offset-4">
-              Privacy Policy
-            </Link>
-          </p>
-
-          <div className="my-6 flex items-center gap-3">
-            <span className="h-px flex-1 bg-ink/15" />
-            <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">
-              Or
-            </span>
-            <span className="h-px flex-1 bg-ink/15" />
-          </div>
-
-          <form onSubmit={onSubmit} className="space-y-4">
-            {isSignup && (
-              <label className="block">
-                <span className="mb-1.5 block text-[13px] font-semibold text-ink">
-                  Name
-                </span>
-                <input
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
-                  placeholder="Waseem Javed"
-                  required
-                  autoComplete="name"
-                  className="h-12 w-full rounded-xl border border-ink/20 bg-surface px-3 text-[15px] text-ink outline-none placeholder:text-muted/50 focus:border-cerulean"
-                />
-              </label>
-            )}
-            <label className="block">
-              <span className="mb-1.5 block text-[13px] font-semibold text-ink">
-                Email
-              </span>
-              <input
-                type="email"
-                value={email}
-                onChange={(e) => setEmail(e.target.value)}
-                placeholder="you@example.com"
-                required
-                autoComplete="email"
-                className="h-12 w-full rounded-xl border border-ink/20 bg-surface px-3 text-[15px] text-ink outline-none placeholder:text-muted/50 focus:border-cerulean"
-              />
-            </label>
-            <label className="block">
-              <span className="mb-1.5 flex items-center justify-between text-[13px] font-semibold text-ink">
-                Password
-                {!isSignup && (
-                  <span className="font-medium text-muted">Forgot?</span>
-                )}
-              </span>
-              <input
-                type="password"
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder="••••••••"
-                required
-                minLength={8}
-                autoComplete={isSignup ? "new-password" : "current-password"}
-                className="h-12 w-full rounded-xl border border-ink/20 bg-surface px-3 text-[15px] text-ink outline-none placeholder:text-muted/50 focus:border-cerulean"
-              />
-            </label>
-            <button
-              type="submit"
-              disabled={busy !== null}
-              className="mt-2 flex h-11 w-full items-center justify-center rounded-lg bg-btn text-[15px] font-medium text-btn-fg transition-all duration-150 hover:bg-btn-hover active:scale-[0.98] disabled:opacity-60"
-            >
-              {busy === "form"
-                ? "Please wait..."
-                : isSignup
-                  ? "Create account"
-                  : "Sign in"}
-            </button>
-          </form>
-
-          <p className="mt-4 text-[12px] leading-relaxed text-muted">
-            By continuing you agree to the{" "}
-            <Link href="/terms" className="font-medium text-ink underline underline-offset-4">
-              Terms of Service
-            </Link>{" "}
-            and{" "}
-            <Link href="/privacy" className="font-medium text-ink underline underline-offset-4">
-              Privacy Policy
-            </Link>
-            . Cookies are explained in the{" "}
-            <Link href="/cookies" className="font-medium text-ink underline underline-offset-4">
-              Cookie Policy
-            </Link>
-            .
-          </p>
-
-          <p className="mt-8 text-center text-[14px] text-muted">
-            {isSignup ? (
-              <>
-                Already have an account?{" "}
-                <Link href="/login" className="font-bold text-ink">
-                  Log in
-                </Link>
-              </>
-            ) : (
-              <>
-                No account?{" "}
-                <Link href="/signup" className="font-bold text-ink">
-                  Create your AI
-                </Link>
-              </>
-            )}
-          </p>
-        </div>
+      <div className="my-6 flex items-center gap-3">
+        <span className="h-px flex-1 bg-ink/15" />
+        <span className="text-[11px] font-bold uppercase tracking-[0.14em] text-muted">Or</span>
+        <span className="h-px flex-1 bg-ink/15" />
       </div>
-    </div>
+
+      <form onSubmit={form.handleSubmit(onSubmit)} className="space-y-4" noValidate>
+        {isSignup ? (
+          <AuthField label="Name" error={form.formState.errors.name?.message}>
+            {(className) => (
+              <input
+                {...form.register("name")}
+                placeholder="Waseem Javed"
+                autoComplete="name"
+                className={className}
+              />
+            )}
+          </AuthField>
+        ) : null}
+        <AuthField label="Email" error={form.formState.errors.email?.message}>
+          {(className) => (
+            <input
+              {...form.register("email")}
+              type="email"
+              placeholder="you@example.com"
+              autoComplete="email"
+              className={className}
+            />
+          )}
+        </AuthField>
+        <AuthField
+          label="Password"
+          error={form.formState.errors.password?.message}
+          extra={
+            !isSignup ? (
+              <Link href="/forgot" className="font-medium text-muted underline-offset-4 hover:text-ink hover:underline">
+                Forgot?
+              </Link>
+            ) : null
+          }
+        >
+          {(className) => (
+            <input
+              {...form.register("password")}
+              type="password"
+              placeholder="••••••••"
+              autoComplete={isSignup ? "new-password" : "current-password"}
+              className={className}
+            />
+          )}
+        </AuthField>
+        <button
+          type="submit"
+          disabled={busy !== null}
+          className="mt-2 flex h-11 w-full items-center justify-center rounded-lg bg-btn text-[15px] font-medium text-btn-fg transition-all duration-150 hover:bg-btn-hover active:scale-[0.98] disabled:opacity-60"
+        >
+          {busy === "form" ? "Please wait..." : isSignup ? "Create account" : "Sign in"}
+        </button>
+      </form>
+
+      <p className="mt-4 text-[12px] leading-relaxed text-muted">
+        By continuing you agree to the{" "}
+        <Link href="/terms" className="font-medium text-ink underline underline-offset-4">
+          Terms of Service
+        </Link>{" "}
+        and{" "}
+        <Link href="/privacy" className="font-medium text-ink underline underline-offset-4">
+          Privacy Policy
+        </Link>
+        . Cookies are explained in the{" "}
+        <Link href="/cookies" className="font-medium text-ink underline underline-offset-4">
+          Cookie Policy
+        </Link>
+        .
+      </p>
+
+      <p className="mt-8 text-center text-[14px] text-muted">
+        {isSignup ? (
+          <>
+            Already have an account?{" "}
+            <Link href="/login" className="font-bold text-ink">
+              Log in
+            </Link>
+          </>
+        ) : (
+          <>
+            No account?{" "}
+            <Link href="/signup" className="font-bold text-ink">
+              Create your AI
+            </Link>
+          </>
+        )}
+      </p>
+    </AuthShell>
   );
 }

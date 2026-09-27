@@ -7,9 +7,15 @@ import { RangeControl, ToneSelector } from "@/components/ui/tone-selector";
 import { CheckMark, StepIndicator } from "@/components/ui/status";
 import { VoiceCard } from "@/components/ui/voice-card";
 import { VoiceOrb } from "@/components/ui/voice-orb";
-import { voices } from "@/lib/mock";
 import type { OwnerProfileRow } from "@/lib/resume/schema";
 import type { Personality } from "@/lib/types";
+import {
+  assemblyVoiceId,
+  DEFAULT_ASSEMBLY_VOICE,
+  VOICE_VIBES,
+  voicesForVibe,
+} from "@/lib/voice/assembly-voices";
+import { useAssemblyVoicePreview } from "@/lib/voice/use-voice-preview";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
@@ -28,14 +34,14 @@ export default function CreatePage() {
   const [profile, setProfile] = useState<OwnerProfileRow | null>(null);
   const [loadError, setLoadError] = useState("");
   const [step, setStep] = useState(1);
-  const [voice, setVoice] = useState("Alex");
-  const [playing, setPlaying] = useState<string | null>(null);
+  const [voice, setVoice] = useState(DEFAULT_ASSEMBLY_VOICE);
   const [personality, setPersonality] = useState<Personality>("professional");
   const [formality, setFormality] = useState(0.3);
   const [verbosity, setVerbosity] = useState(0.5);
   const [phase, setPhase] = useState<"edit" | "generating" | "ready">("edit");
   const [genAt, setGenAt] = useState(0);
   const [error, setError] = useState("");
+  const preview = useAssemblyVoicePreview();
 
   useEffect(() => {
     void (async () => {
@@ -50,7 +56,7 @@ export default function CreatePage() {
       }
       setProfile(payload.profile);
       const json = payload.profile.profile_json;
-      setVoice(json.voice || "Alex");
+      setVoice(assemblyVoiceId(json.voice));
       setPersonality(json.personality || "professional");
       setFormality(json.formality ?? 0.3);
       setVerbosity(json.verbosity ?? 0.5);
@@ -179,27 +185,51 @@ export default function CreatePage() {
             exit={{ opacity: 0, y: -12 }}
             className="mt-10"
           >
-            <h1 className="text-[40px] font-bold tracking-tight">Choose your voice.</h1>
-            <div className="mt-10 grid gap-3 sm:grid-cols-2">
-              {voices.map((item) => (
-                <VoiceCard
-                  key={item.id}
-                  voice={item}
-                  selected={voice === item.name}
-                  playing={playing === item.id}
-                  onSelect={() => {
-                    setVoice(item.name);
-                    setPlaying(playing === item.id ? null : item.id);
-                  }}
-                />
+            <h1 className="text-[40px] font-bold tracking-tight">Pick a voice that matches your vibe.</h1>
+            <p className="mt-3 max-w-xl text-[16px] text-muted">
+              Formal, casual, or energetic. This is the AssemblyAI voice visitors hear on your public page.
+            </p>
+            <div className="mt-10 space-y-8">
+              {VOICE_VIBES.map((vibe) => (
+                <div key={vibe}>
+                  <p className="label capitalize">{vibe}</p>
+                  <div className="mt-3 grid gap-3 sm:grid-cols-3">
+                    {voicesForVibe(vibe).map((item) => (
+                      <VoiceCard
+                        key={item.id}
+                        voice={item}
+                        selected={voice === item.id}
+                        playing={preview.playing === item.id}
+                        onSelect={() => {
+                          setVoice(item.id);
+                          void preview.preview(item.id);
+                        }}
+                      />
+                    ))}
+                  </div>
+                </div>
               ))}
             </div>
-            {error && <p className="mt-6 text-[14px] text-danger">{error}</p>}
+            {(error || preview.error) && (
+              <p className="mt-6 text-[14px] text-danger">{error || preview.error}</p>
+            )}
             <div className="mt-10 flex flex-wrap gap-3">
-              <MagneticButton variant="ghost" onClick={() => router.push("/app/review")}>
+              <MagneticButton
+                variant="ghost"
+                onClick={() => {
+                  preview.stop();
+                  router.push("/app/review");
+                }}
+              >
                 Back
               </MagneticButton>
-              <MagneticButton arrow onClick={() => setStep(2)}>
+              <MagneticButton
+                arrow
+                onClick={() => {
+                  preview.stop();
+                  setStep(2);
+                }}
+              >
                 Continue
               </MagneticButton>
             </div>

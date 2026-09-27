@@ -53,7 +53,6 @@ export const profiles = pgTable(
       .notNull()
       .default(sql`'{}'::jsonb`),
     resumePath: text("resume_path"),
-    bookingUrl: text("booking_url"),
     createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
@@ -91,7 +90,6 @@ export const calls = pgTable(
     insightToneLabel: text("insight_tone_label"),
     insightFitLabel: text("insight_fit_label"),
     assemblySessionId: text("assembly_session_id"),
-    bookingLinkShownAt: timestamp("booking_link_shown_at", { withTimezone: true }),
   },
   (table) => [
     index("calls_profile_started_idx").on(table.profileId, table.startedAt),

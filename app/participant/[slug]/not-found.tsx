@@ -1,6 +1,6 @@
 import Link from "next/link";
 
-export default function PublicProfileNotFound() {
+export default function ParticipantNotFound() {
   return (
     <div className="flex min-h-screen flex-col items-center justify-center px-6 text-center">
       <h1 className="text-[40px] font-bold tracking-tight">Profile not found.</h1>

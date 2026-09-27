@@ -23,6 +23,7 @@ export function safeNextPath(raw: string | null | undefined) {
   }
 
   if (!isSafeRelativePath(value)) return FALLBACK;
+  if (value === "/reset-password") return value;
   if (value === "/app" || value.startsWith("/app/")) return value;
   return FALLBACK;
 }
