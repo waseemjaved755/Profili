@@ -1,5 +1,7 @@
+/* Changelog: Now speaking status pill + waveform; chat bubbles with sequential visitor → typing → reply. */
 "use client";
 
+import { EqBars } from "@/components/landing/reveal";
 import { Hero, ResumeCard } from "@/components/landing/hero";
 import { useResumePick } from "@/components/landing/resume-pick";
 import { SineEqualizer } from "@/components/landing/sine-eq";
@@ -14,7 +16,7 @@ import {
   useTransform,
   type MotionValue,
 } from "framer-motion";
-import { useRef, type RefObject } from "react";
+import { useEffect, useRef, useState, type RefObject } from "react";
 
 export function HeroStory() {
   const convertRef = useRef<HTMLElement>(null);
@@ -90,50 +92,154 @@ function ConvertStage({
               style={{ opacity: orbOpacity, scale: orbScale }}
             >
               <span className="absolute right-2 top-2 z-10 inline-flex items-center gap-1.5 rounded-full border border-border bg-subtle px-2.5 py-1 font-mono text-[11px] text-navy">
-                <span className="ping-live h-1.5 w-1.5 rounded-full bg-good" />
+                <span className="ping-live h-1.5 w-1.5 rounded-full" style={{ background: "var(--live)" }} />
                 {flying.firstName}
               </span>
               <div className="flex justify-center pt-6">
                 <VoiceOrb size={240} state="speaking" name={flying.firstName} />
               </div>
               <SineEqualizer active className="mt-2" />
-              <p className="mt-3 text-center text-[18px] font-semibold tracking-tight text-ink">
+              <p className="mt-3 flex items-center justify-center gap-2 text-[18px] font-semibold tracking-tight text-ink">
                 {flying.name}
+                <EqBars />
               </p>
               <p className="text-center text-[12px] font-bold text-muted">{flying.role}</p>
             </motion.div>
           </div>
 
           <motion.div style={{ opacity: copyOpacity, y: copyY }}>
-            <p className="label">Now speaking</p>
+            <p className="label inline-flex items-center gap-2 rounded-full border border-border bg-subtle px-2.5 py-1">
+              <span className="ping-live h-1.5 w-1.5 rounded-full" style={{ background: "var(--live)" }} />
+              Now speaking
+              <EqBars />
+            </p>
             <h2 className="mt-3 text-[36px] font-semibold tracking-tight text-ink sm:text-[52px]">{flying.name}</h2>
             <p className="mt-4 max-w-xl text-[16px] text-muted">
               The résumé becomes a voice you can hear, grounded in the page.
               Talk over it and it stops. That interrupt is the hard part.
             </p>
-            <div className="mt-8 space-y-4">
-              <div className="flex gap-3 rounded-2xl border border-border bg-surface p-4 shadow-sm">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg border border-border bg-subtle font-mono text-[12px] font-medium text-steel">
-                  R
-                </span>
-                <div>
-                  <p className="font-mono text-[11px] font-medium text-steel">Recruiter</p>
-                  <p className="mt-1 text-[15px] text-ink">{flying.question}</p>
-                </div>
-              </div>
-              <div className="flex gap-3 rounded-2xl border border-border bg-deep p-4 text-white">
-                <span className="grid h-12 w-12 shrink-0 place-items-center rounded-lg bg-[#89C2D9] text-[13px] font-semibold text-deep">
-                  {flying.initials}
-                </span>
-                <div>
-                  <p className="font-mono text-[11px] font-medium text-[#89C2D9]">{flying.firstName}</p>
-                  <p className="mt-1 text-[15px]">{flying.answer}</p>
-                </div>
-              </div>
-            </div>
+            <VoiceTranscript
+              question={flying.question}
+              answer={flying.answer}
+              firstName={flying.firstName}
+              initials={flying.initials}
+              reduce={reduce}
+            />
           </motion.div>
         </div>
       </div>
     </section>
+  );
+}
+
+function VoiceTranscript({
+  question,
+  answer,
+  firstName,
+  initials,
+  reduce,
+}: {
+  question: string;
+  answer: string;
+  firstName: string;
+  initials: string;
+  reduce: boolean;
+}) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [phase, setPhase] = useState(reduce ? 3 : 0);
+
+  useEffect(() => {
+    if (reduce) {
+      setPhase(3);
+      return;
+    }
+    setPhase(0);
+    const node = ref.current;
+    if (!node) return;
+    let t1 = 0;
+    let t2 = 0;
+    let t3 = 0;
+    const io = new IntersectionObserver(
+      ([entry]) => {
+        if (!entry?.isIntersecting) return;
+        io.disconnect();
+        t1 = window.setTimeout(() => setPhase(1), 80);
+        t2 = window.setTimeout(() => setPhase(2), 720);
+        t3 = window.setTimeout(() => setPhase(3), 1480);
+      },
+      { threshold: 0.35 },
+    );
+    io.observe(node);
+    return () => {
+      io.disconnect();
+      window.clearTimeout(t1);
+      window.clearTimeout(t2);
+      window.clearTimeout(t3);
+    };
+  }, [reduce, question, firstName]);
+
+  return (
+    <div ref={ref} className="mt-8 space-y-3">
+      {phase >= 1 ? (
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 24 }}
+          className="flex gap-3 rounded-2xl rounded-tl-md border border-border bg-surface p-4 shadow-sm"
+        >
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full border border-border bg-subtle font-mono text-[12px] font-medium text-steel">
+            R
+          </span>
+          <div className="min-w-0">
+            <p className="flex items-center gap-2 font-mono text-[11px] font-medium text-steel">
+              Visitor
+              <span className="ping-live h-1.5 w-1.5 rounded-full" style={{ background: "var(--live)" }} />
+            </p>
+            <p className="mt-1 text-[15px] text-ink">{question}</p>
+          </div>
+        </motion.div>
+      ) : null}
+
+      {phase === 2 ? (
+        <div className="flex gap-3 rounded-2xl rounded-bl-md border border-border bg-deep p-4 text-white">
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#89C2D9] text-[13px] font-semibold text-deep">
+            {initials}
+          </span>
+          <div>
+            <p className="font-mono text-[11px] font-medium text-[#89C2D9]">{firstName}</p>
+            <span className="mt-3 flex gap-1" aria-hidden>
+              {[0, 1, 2].map((i) => (
+                <motion.span
+                  key={i}
+                  className="h-1.5 w-1.5 rounded-full bg-[#89C2D9]"
+                  animate={{ opacity: [0.3, 1, 0.3], y: [0, -3, 0] }}
+                  transition={{ duration: 0.7, repeat: Infinity, delay: i * 0.12, ease: [0.22, 1, 0.36, 1] }}
+                />
+              ))}
+            </span>
+          </div>
+        </div>
+      ) : null}
+
+      {phase >= 3 ? (
+        <motion.div
+          initial={reduce ? false : { opacity: 0, y: 10 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ type: "spring", stiffness: 300, damping: 24 }}
+          className="flex gap-3 rounded-2xl rounded-bl-md border border-border bg-deep p-4 text-white"
+        >
+          <span className="grid h-12 w-12 shrink-0 place-items-center rounded-full bg-[#89C2D9] text-[13px] font-semibold text-deep">
+            {initials}
+          </span>
+          <div>
+            <p className="flex items-center gap-2 font-mono text-[11px] font-medium text-[#89C2D9]">
+              {firstName}
+              <EqBars />
+            </p>
+            <p className="mt-1 text-[15px]">{answer}</p>
+          </div>
+        </motion.div>
+      ) : null}
+    </div>
   );
 }

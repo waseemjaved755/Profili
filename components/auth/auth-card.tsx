@@ -1,3 +1,4 @@
+/* Changelog: trust copy stays; lock / eye-off icons for scan; fade-only, no playful motion. */
 "use client";
 
 import { AuthField } from "@/components/auth/auth-field";
@@ -11,6 +12,7 @@ import { safeNextPath } from "@/lib/auth/safe-next";
 import { authFormSchema, type AuthFormValues } from "@/lib/auth/schemas";
 import { isSupabaseConfigured } from "@/lib/supabase/env";
 import { zodResolver } from "@hookform/resolvers/zod";
+import { EyeOff, Lock } from "lucide-react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -266,12 +268,18 @@ export function AuthCard({
         <GoogleMark />
         {busy === "google" ? "Redirecting..." : "Continue with Google"}
       </button>
-      <p className="mt-2 text-[12px] leading-relaxed text-muted">
+      <p className="mt-2 flex items-start gap-2 text-[12px] leading-relaxed text-muted">
+        <span className="mt-0.5 flex shrink-0 gap-1 text-steel">
+          <Lock size={13} strokeWidth={2.2} aria-hidden />
+          <EyeOff size={13} strokeWidth={2.2} aria-hidden />
+        </span>
+        <span>
         Google is used only to get your name and email so we can create or open your account. We do not
         access Gmail or Drive.{" "}
         <Link href="/privacy" className="font-medium text-ink underline underline-offset-4">
           Privacy Policy
         </Link>
+        </span>
       </p>
 
       <div className="my-6 flex items-center gap-3">

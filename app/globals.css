@@ -1,5 +1,7 @@
 @import "tailwindcss";
 
+/* Changelog: --live accent for speaking states; eyebrow .label tracking; reduced-motion already gates loops. */
+
 @custom-variant dark (&:where(.dark, .dark *));
 
 :root {
@@ -48,6 +50,7 @@
   --glow-2: rgb(44 125 160 / 0.28);
   --accent-pulse: #61a5c2;
   --accent-pulse-2: #2c7da0;
+  --live: #2c7da0;
   --shadow-sm: 0 1px 3px 0 rgb(1 42 74 / 0.04), 0 1px 2px -1px rgb(1 42 74 / 0.04);
   --shadow-lg:
     0 1px 1px rgb(1 42 74 / 0.03),
@@ -91,6 +94,7 @@
   --text-primary: var(--ink);
   --glow: rgb(44 125 160 / 0.5);
   --glow-2: rgb(97 165 194 / 0.38);
+  --live: #7ee0c8;
   --shadow-sm: 0 1px 3px 0 rgb(0 0 0 / 0.35), 0 1px 2px -1px rgb(0 0 0 / 0.28);
   --shadow-lg:
     0 1px 1px rgb(0 0 0 / 0.25),
@@ -222,10 +226,76 @@ button:disabled,
 .label {
   font-family: var(--font-mono);
   font-size: 11px;
-  letter-spacing: 0.04em;
+  letter-spacing: 0.12em;
   text-transform: uppercase;
   font-weight: 500;
   color: var(--steel);
+}
+
+@keyframes eq-bar {
+  0%,
+  100% {
+    transform: scaleY(0.35);
+  }
+  50% {
+    transform: scaleY(1);
+  }
+}
+
+.eq-bars {
+  display: inline-flex;
+  align-items: flex-end;
+  gap: 2px;
+  height: 12px;
+}
+
+.eq-bars span {
+  width: 2px;
+  height: 12px;
+  border-radius: 999px;
+  background: var(--live);
+  transform-origin: bottom;
+  animation: eq-bar 0.9s cubic-bezier(0.22, 1, 0.36, 1) infinite;
+}
+
+.eq-bars span:nth-child(2) {
+  animation-delay: 0.12s;
+}
+
+.eq-bars span:nth-child(3) {
+  animation-delay: 0.24s;
+}
+
+.eq-bars span:nth-child(4) {
+  animation-delay: 0.08s;
+}
+
+.eq-bars span:nth-child(5) {
+  animation-delay: 0.2s;
+}
+
+.shake-x {
+  animation: shake-x 0.42s cubic-bezier(0.36, 0.07, 0.19, 0.97);
+}
+
+@keyframes shake-x {
+  10%,
+  90% {
+    transform: translateX(-2px);
+  }
+  20%,
+  80% {
+    transform: translateX(4px);
+  }
+  30%,
+  50%,
+  70% {
+    transform: translateX(-6px);
+  }
+  40%,
+  60% {
+    transform: translateX(6px);
+  }
 }
 
 @layer components {
@@ -644,7 +714,9 @@ button:disabled,
   .glow-cta::before,
   .console-beam::before,
   .footer-beam::after,
-  .bleed-rule::after {
+  .bleed-rule::after,
+  .eq-bars span,
+  .shake-x {
     animation: none;
     transition: none;
   }

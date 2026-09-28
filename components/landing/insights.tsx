@@ -1,9 +1,11 @@
+/* Changelog: count-up on completed calls; score bars fill on view; stacked intent bar draws in; feed items slide/fade. */
 "use client";
 
 import { VISITORS, type Visitor } from "@/lib/visitors";
+import { useInViewOnce } from "@/components/landing/reveal";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 const ease = [0.16, 1, 0.3, 1] as const;
 
@@ -24,10 +26,14 @@ function ScoreCard({
   label,
   value,
   note,
+  shown,
+  reduce,
 }: {
   label: string;
   value: number;
   note: string;
+  shown: boolean;
+  reduce: boolean;
 }) {
   return (
     <div className="min-w-0 rounded-lg border border-[#01497C]/10 bg-[#FAFAFA] px-2.5 py-2 text-left dark:border-[#89C2D9]/25 dark:bg-[#012A4A]/30">
@@ -37,6 +43,14 @@ function ScoreCard({
       <p className="mt-1 text-[20px] font-semibold leading-none tracking-tight text-ink sm:text-[22px]">
         {value}%
       </p>
+      <div className="mt-2 h-1 overflow-hidden rounded-full bg-[#01497C]/10 dark:bg-[#89C2D9]/20">
+        <motion.div
+          className="h-full origin-left rounded-full bg-[#2A6F97]"
+          initial={{ scaleX: reduce ? 1 : 0 }}
+          animate={{ scaleX: shown || reduce ? value / 100 : 0 }}
+          transition={{ type: "spring", stiffness: 140, damping: 22 }}
+        />
+      </div>
       <p className="mt-1 truncate text-[11px] text-ink/80">{note}</p>
     </div>
   );
@@ -74,9 +88,11 @@ function CallTranscript({ turns }: { turns: Array<{ seq: number; speaker: string
 function Inspector({
   active,
   reduce,
+  meters,
 }: {
   active: Visitor;
   reduce: boolean;
+  meters: boolean;
 }) {
   const topic = active.query.trim();
   const summary = active.answer.trim();
@@ -152,9 +168,9 @@ function Inspector({
       <div className="mt-4 shrink-0 border-t border-[#01497C]/12 pt-4 dark:border-[#89C2D9]/30">
         <p className="mb-2 font-mono text-[9px] tracking-wider text-[#468FAF] uppercase">Scores</p>
         <div className="grid grid-cols-3 gap-2">
-          <ScoreCard label="Factual Groundedness" value={active.grounded} note="Grounded in CV" />
-          <ScoreCard label="Delivery & Tone" value={active.tone} note={active.toneLabel} />
-          <ScoreCard label="Visitor Fit Score" value={active.clarity} note={active.fitLabel} />
+          <ScoreCard label="Factual Groundedness" value={active.grounded} note="Grounded in CV" shown={meters} reduce={reduce} />
+          <ScoreCard label="Delivery & Tone" value={active.tone} note={active.toneLabel} shown={meters} reduce={reduce} />
+          <ScoreCard label="Visitor Fit Score" value={active.clarity} note={active.fitLabel} shown={meters} reduce={reduce} />
         </div>
       </div>
     </motion.div>
@@ -165,6 +181,24 @@ export function Insights() {
   const reduce = useReducedMotion();
   const [active, setActive] = useState<Visitor>(VISITORS[0]);
   const [pane, setPane] = useState<"feed" | "inspect">("feed");
+  const { ref, shown } = useInViewOnce(0.18);
+  const [count, setCount] = useState(reduce ? VISITORS.length : 0);
+
+  useEffect(() => {
+    if (!shown) return;
+    if (reduce) {
+      setCount(VISITORS.length);
+      return;
+    }
+    const target = VISITORS.length;
+    let n = 0;
+    const id = window.setInterval(() => {
+      n += 1;
+      setCount(n);
+      if (n >= target) window.clearInterval(id);
+    }, 70);
+    return () => window.clearInterval(id);
+  }, [shown, reduce]);
 
   function select(person: Visitor) {
     setActive(person);
@@ -188,6 +222,7 @@ export function Insights() {
   return (
     <section
       id="insights"
+      ref={ref}
       className="flex flex-col px-4 py-10 sm:px-6 md:py-12 lg:h-[calc(100svh-4.5rem)] lg:scroll-mt-[4.5rem] lg:py-5 xl:py-6"
     >
       <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col">
@@ -209,8 +244,9 @@ export function Insights() {
                 </span>
                 <span className="font-mono text-[12px] font-medium text-ink">Insights</span>
               </div>
-              <span className="font-mono text-[11px] text-[#2A6F97] dark:text-ice">
-                {VISITORS.length} completed calls
+              <span className="inline-flex items-center gap-1.5 font-mono text-[11px] text-[#2A6F97] dark:text-ice">
+                <span className="ping-live h-1.5 w-1.5 rounded-full" style={{ background: "var(--live)" }} />
+                {count} completed calls
               </span>
             </div>
 
@@ -247,10 +283,15 @@ export function Insights() {
                   </span>
                 </div>
                 <ul className="min-h-0 flex-1 space-y-px overflow-y-auto px-1.5 pb-2">
-                  {VISITORS.map((person) => {
+                  {VISITORS.map((person, index) => {
                     const selected = person.id === active.id;
                     return (
-                      <li key={person.id}>
+                      <motion.li
+                        key={person.id}
+                        initial={reduce ? false : { opacity: 0, x: -10 }}
+                        animate={{ opacity: 1, x: 0 }}
+                        transition={{ type: "spring", stiffness: 320, damping: 24, delay: reduce ? 0 : index * 0.07 }}
+                      >
                         <button
                           type="button"
                           aria-pressed={selected}
@@ -277,7 +318,7 @@ export function Insights() {
                             </span>
                           </span>
                         </button>
-                      </li>
+                      </motion.li>
                     );
                   })}
                 </ul>
@@ -289,19 +330,22 @@ export function Insights() {
                 } md:flex`}
               >
                 <AnimatePresence mode="wait" initial={false}>
-                  <Inspector key={active.id} active={active} reduce={!!reduce} />
+                  <Inspector key={active.id} active={active} reduce={!!reduce} meters={shown} />
                 </AnimatePresence>
 
                 <div className="mt-3 shrink-0 border-t border-[#01497C]/12 pt-2.5 dark:border-[#89C2D9]/30">
                   <p className="font-mono text-[9px] font-medium tracking-wider text-[#468FAF] uppercase">
                     Intent distribution
                   </p>
-                  <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full">
+                  <div className="mt-1.5 flex h-1.5 overflow-hidden rounded-full bg-[#01497C]/10 dark:bg-[#89C2D9]/15">
                     {intents.map((row) => (
-                      <span
+                      <motion.span
                         key={row.label}
                         className="h-full"
-                        style={{ width: `${row.pct}%`, background: row.color }}
+                        initial={{ width: reduce ? `${row.pct}%` : 0 }}
+                        animate={{ width: shown || reduce ? `${row.pct}%` : 0 }}
+                        transition={{ type: "spring", stiffness: 120, damping: 22 }}
+                        style={{ background: row.color }}
                       />
                     ))}
                   </div>

@@ -1,4 +1,4 @@
-import { BargeIn } from "@/components/landing/barge-in";
+/* Changelog: landing composition unchanged; motion lives in section components. */
 import { ResumePickProvider } from "@/components/landing/resume-pick";
 import { Insights } from "@/components/landing/insights";
 import { Footer } from "@/components/landing/footer";
@@ -16,7 +16,6 @@ export default function Home() {
       <main>
         <HeroStory />
         <Steps />
-        <BargeIn />
         <PortfolioEmbed />
         <Insights />
         <Pricing />

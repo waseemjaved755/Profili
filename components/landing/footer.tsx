@@ -1,3 +1,4 @@
+/* Changelog: footer brand, product, solutions, legal. LinkedIn only. */
 "use client";
 
 import { BrandMark, Wordmark } from "@/components/ui/wordmark";
@@ -15,41 +16,7 @@ const product = [
 ];
 
 const solutions = [
-  { href: "/talk/waseem", label: "Example voice" },
-  { href: "/signup", label: "For candidates" },
-  { href: "#insights", label: "For recruiters" },
-];
-
-const socials = [
-  {
-    label: "Profili on X",
-    href: "https://x.com/profili",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 fill-current" aria-hidden>
-        <path d="M18.9 2H22l-6.8 7.8L23.3 22h-6.6l-5.2-6.8L5.8 22H2.7l7.3-8.3L.8 2h6.7l4.7 6.2L18.9 2Zm-1.2 18h1.8L6.4 3.9H4.5L17.7 20Z" />
-      </svg>
-    ),
-  },
-  {
-    label: "Profili on Instagram",
-    href: "https://instagram.com/profili",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-4 w-4" fill="none" stroke="currentColor" strokeWidth="2.2" aria-hidden>
-        <rect x="3" y="3" width="18" height="18" rx="5" />
-        <circle cx="12" cy="12" r="4" />
-        <circle cx="17.5" cy="6.5" r="1" fill="currentColor" stroke="none" />
-      </svg>
-    ),
-  },
-  {
-    label: "Profili on LinkedIn",
-    href: "https://linkedin.com/company/profili",
-    icon: (
-      <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden>
-        <path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S.02 4.88.02 3.5 1.14 1 2.5 1s2.48 1.12 2.48 2.5zM.2 8.25h4.6V23H.2V8.25zM8.34 8.25h4.4v2.01h.06c.61-1.16 2.11-2.38 4.35-2.38 4.65 0 5.51 3.06 5.51 7.04V23h-4.6v-6.62c0-1.58-.03-3.61-2.2-3.61-2.2 0-2.54 1.72-2.54 3.5V23h-4.58V8.25z" />
-      </svg>
-    ),
-  },
+  { href: "/signup", label: "For professionals" },
 ];
 
 export function Footer() {
@@ -62,20 +29,17 @@ export function Footer() {
             <p className="mt-4 max-w-xs text-[14px] font-medium text-white/70">
               Your experience, articulated in high-definition voice.
             </p>
-            <div className="mt-5 flex items-center gap-2">
-              {socials.map((item) => (
-                <a
-                  key={item.label}
-                  href={item.href}
-                  target="_blank"
-                  rel="noreferrer"
-                  aria-label={item.label}
-                  className="grid h-9 w-9 place-items-center rounded-lg border border-white/15 bg-white/5 text-white transition-all duration-150 hover:-translate-y-px hover:border-white/35 hover:bg-white/10"
-                >
-                  {item.icon}
-                </a>
-              ))}
-            </div>
+            <a
+              href="https://www.linkedin.com/company/profili-fyi/?viewAsMember=true"
+              target="_blank"
+              rel="noreferrer"
+              aria-label="Profili on LinkedIn"
+              className="mt-5 grid h-9 w-9 place-items-center rounded-lg border border-white/15 bg-white/5 text-white transition-[transform,color,background-color,border-color] duration-150 hover:scale-110 hover:border-white/40 hover:bg-white/12 hover:text-[#89C2D9]"
+            >
+              <svg viewBox="0 0 24 24" className="h-4 w-4 fill-current" aria-hidden>
+                <path d="M4.98 3.5C4.98 4.88 3.86 6 2.5 6S.02 4.88.02 3.5 1.14 1 2.5 1s2.48 1.12 2.48 2.5zM.2 8.25h4.6V23H.2V8.25zM8.34 8.25h4.4v2.01h.06c.61-1.16 2.11-2.38 4.35-2.38 4.65 0 5.51 3.06 5.51 7.04V23h-4.6v-6.62c0-1.58-.03-3.61-2.2-3.61-2.2 0-2.54 1.72-2.54 3.5V23h-4.58V8.25z" />
+              </svg>
+            </a>
           </div>
           <Col title="Product" items={product} />
           <Col title="Solutions" items={solutions} />

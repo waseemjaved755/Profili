@@ -1,3 +1,4 @@
+/* Changelog: device-frame embed mock with idle↔speaking cycle; editor chrome + line numbers; Copy→Copied icon morph. */
 "use client";
 
 import { useResumePick } from "@/components/landing/resume-pick";
@@ -87,12 +88,19 @@ export function PortfolioEmbed() {
   const reduce = useReducedMotion();
   const [tab, setTab] = useState<EmbedTab>("iframe");
   const [copied, setCopied] = useState(false);
+  const [talking, setTalking] = useState(false);
   const copyTimer = useRef<number | null>(null);
   const iframeTabRef = useRef<HTMLButtonElement>(null);
   const scriptTabRef = useRef<HTMLButtonElement>(null);
   const ids = useId();
   const snippet = tab === "iframe" ? iframeParts(SAMPLE_SLUG) : scriptParts(SAMPLE_SLUG);
   const siteHost = `${person.firstName.toLowerCase()}.dev`;
+
+  useEffect(() => {
+    if (reduce) return;
+    const id = window.setInterval(() => setTalking((on) => !on), 3200);
+    return () => window.clearInterval(id);
+  }, [reduce]);
 
   useEffect(() => {
     return () => {
@@ -125,7 +133,7 @@ export function PortfolioEmbed() {
           Embed it on your portfolio.
         </h2>
         <p className="mt-4 max-w-xl text-[16px] text-muted">
-          One snippet. Recruiters stay on your page and talk to your résumé.
+          One snippet. Visitors stay on your page and talk to your résumé.
           Same agent as your public link.
         </p>
 
@@ -178,19 +186,29 @@ export function PortfolioEmbed() {
                 </div>
 
                 <aside className="flex items-center justify-center bg-subtle p-4 md:p-5">
-                  <div className="w-full rounded-2xl border border-(--air)/35 bg-deep p-4 text-white shadow-[0_0_32px_rgb(97_165_194/0.22)]">
-                    <p className="font-mono text-[10px] font-medium tracking-wide text-[#89C2D9] uppercase">
+                  <div className="w-full max-w-[220px] rounded-[1.65rem] border-[6px] border-[#0E1B2E] bg-[#0E1B2E] p-1 shadow-[0_18px_40px_rgb(14_27_46/0.35)]">
+                    <div className="rounded-[1.2rem] border border-(--air)/35 bg-deep p-4 text-white">
+                    <p
+                      className={`font-mono text-[10px] font-medium tracking-wide text-[#89C2D9] uppercase transition-opacity duration-300 ${
+                        talking ? "opacity-45" : "opacity-100"
+                      }`}
+                    >
                       Talk to me
                     </p>
                     <div className="mt-3 flex justify-center">
                       <motion.div
-                        animate={reduce ? undefined : { scale: [1, 1.045, 1] }}
-                        transition={{ duration: 3.2, repeat: Infinity, ease: "easeInOut" }}
+                        animate={reduce ? undefined : { scale: talking ? [1, 1.04, 1] : [1, 1.02, 1] }}
+                        transition={{ duration: 3.2, repeat: Infinity, ease: [0.22, 1, 0.36, 1] }}
                       >
-                        <VoiceOrb size={120} state="idle" interactive={false} name={person.firstName} />
+                        <VoiceOrb
+                          size={120}
+                          state={talking ? "speaking" : "idle"}
+                          interactive={false}
+                          name={person.firstName}
+                        />
                       </motion.div>
                     </div>
-                    <VoiceWaveform state="idle" compact className="mt-1" />
+                    <VoiceWaveform state={talking ? "speaking" : "idle"} compact className="mt-1" />
                     <p className="mt-3 text-center text-[15px] font-semibold tracking-tight">
                       {person.firstName}
                     </p>
@@ -198,7 +216,11 @@ export function PortfolioEmbed() {
                       Grounded in the résumé
                     </p>
                     <button type="button" className="glow-cta glow-cta-ondark mt-4 w-full">
-                      <span className="glow-cta-face min-h-10 px-4 text-[13px] font-medium">
+                      <span
+                        className={`glow-cta-face min-h-10 px-4 text-[13px] font-medium transition-opacity duration-300 ${
+                          talking ? "opacity-100" : "opacity-70"
+                        }`}
+                      >
                         Start talking
                       </span>
                     </button>
@@ -207,6 +229,7 @@ export function PortfolioEmbed() {
                         iframe · 400×640
                       </span>
                     </p>
+                    </div>
                   </div>
                 </aside>
               </div>
@@ -269,9 +292,11 @@ export function PortfolioEmbed() {
                   <button
                     type="button"
                     onClick={() => void copyCode()}
-                    className="absolute right-2 top-2 z-10 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 bg-white/8 px-2.5 py-1.5 font-mono text-[11px] font-medium text-[#89C2D9] transition-colors duration-150 hover:border-white/30 hover:bg-white/12"
+                    className="absolute right-2 top-2 z-10 inline-flex cursor-pointer items-center gap-1.5 rounded-lg border border-white/15 bg-white/8 px-2.5 py-1.5 font-mono text-[11px] font-medium text-[#89C2D9] transition-[transform,background-color,border-color] duration-150 hover:border-white/30 hover:bg-white/12 active:scale-[0.97]"
                   >
-                    {copied ? <Check size={12} strokeWidth={2.4} /> : <Copy size={12} strokeWidth={2.4} />}
+                    <span className="grid h-3.5 w-3.5 place-items-center">
+                      {copied ? <Check size={12} strokeWidth={2.6} /> : <Copy size={12} strokeWidth={2.4} />}
+                    </span>
                     {copied ? "Copied" : "Copy"}
                   </button>
                   <div
@@ -281,12 +306,21 @@ export function PortfolioEmbed() {
                     {copied ? "Snippet copied to clipboard" : ""}
                   </div>
                   <pre id={`${ids}-snippet`} role="tabpanel" className="h-full overflow-x-auto p-4 pr-24 font-mono text-[12px] leading-relaxed">
-                    <code>
-                      {snippet.parts.map((part, index) => (
-                        <span key={`${part.kind}-${index}`} className={partClass[part.kind]}>
-                          {part.text}
-                        </span>
-                      ))}
+                    <code className="flex gap-4">
+                      <span className="select-none text-right text-white/25" aria-hidden>
+                        {snippet.copy.split("\n").map((_, index) => (
+                          <span key={index} className="block">
+                            {index + 1}
+                          </span>
+                        ))}
+                      </span>
+                      <span className="min-w-0 whitespace-pre">
+                        {snippet.parts.map((part, index) => (
+                          <span key={`${part.kind}-${index}`} className={partClass[part.kind]}>
+                            {part.text}
+                          </span>
+                        ))}
+                      </span>
                     </code>
                   </pre>
                   <span

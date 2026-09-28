@@ -82,7 +82,7 @@ export const pricingFaqs = [
     a: "Time visitors spend talking with your agent.",
   },
   {
-    q: "Do recruiters pay?",
+    q: "Do visitors pay?",
     a: "No. Talking to an agent is always free for visitors.",
   },
   {
