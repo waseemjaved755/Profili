@@ -50,7 +50,7 @@ export function Reveal({
 }
 
 export function useInViewOnce(threshold = 0.2) {
-  const ref = useRef<HTMLElement | null>(null);
+  const ref = useRef<HTMLDivElement | null>(null);
   const [shown, setShown] = useState(false);
   const reduce = useReducedMotion();
 

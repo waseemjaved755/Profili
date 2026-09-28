@@ -222,10 +222,9 @@ export function Insights() {
   return (
     <section
       id="insights"
-      ref={ref}
       className="flex flex-col px-4 py-10 sm:px-6 md:py-12 lg:h-[calc(100svh-4.5rem)] lg:scroll-mt-[4.5rem] lg:py-5 xl:py-6"
     >
-      <div className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col">
+      <div ref={ref} className="mx-auto flex min-h-0 w-full max-w-6xl flex-1 flex-col">
         <div className="shrink-0">
           <p className="label">Quantitative insights</p>
           <h2 className="mt-1.5 max-w-3xl text-[28px] font-semibold tracking-tight text-ink sm:text-[34px] lg:text-[36px]">
