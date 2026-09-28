@@ -32,7 +32,14 @@ function CookieBannerInner() {
     return () => window.removeEventListener(CONSENT_OPEN_EVENT, onOpen);
   }, [consent.functional]);
 
-  if (!ready || embed || pathname.startsWith("/auth/callback") || !open) return null;
+  if (
+    !ready ||
+    embed ||
+    pathname.startsWith("/auth/callback") ||
+    pathname.startsWith("/presentation") ||
+    !open
+  )
+    return null;
 
   return (
     <div
