@@ -15,12 +15,14 @@ export const notifyMessageJob = inngest.createFunction(
       console.error(JSON.stringify({ msg: "message.email_job_failed", messageId, error: String(error) }));
     },
   },
-  async ({ event }) => {
+  async ({ event, step }) => {
     const { messageId } = event.data as { messageId: string };
-    const db = getDb();
-    const [row] = await db.select({ id: messages.id }).from(messages).where(eq(messages.id, messageId)).limit(1);
-    if (!row) return { skipped: true };
-    await sendOwnerMessageEmail(messageId);
-    return { ok: true };
+    return step.run("send-owner-email", async () => {
+      const db = getDb();
+      const [row] = await db.select({ id: messages.id }).from(messages).where(eq(messages.id, messageId)).limit(1);
+      if (!row) return { skipped: true as const };
+      await sendOwnerMessageEmail(messageId);
+      return { ok: true as const };
+    });
   },
 );

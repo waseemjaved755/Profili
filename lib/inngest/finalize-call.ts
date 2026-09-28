@@ -1,11 +1,11 @@
 import { getDb } from "@/lib/db/client";
 import { calls, transcriptTurns } from "@/lib/db/schema";
-import { EVENT_CALL_ENDED, inngest } from "@/lib/inngest/client";
+import { EVENT_CALL_ENDED, EVENT_CALL_STARTED, inngest } from "@/lib/inngest/client";
 import { failedEventData } from "@/lib/inngest/emit";
 import { fetchSessionTimeline } from "@/lib/voice/assembly-session";
 import { CALL_SECONDS, STALE_CALL_GRACE_MS } from "@/lib/voice/call-window";
 import { generateCallInsights } from "@/lib/voice/insights";
-import { and, eq, isNull, lt } from "drizzle-orm";
+import { and, eq, isNull } from "drizzle-orm";
 import { NonRetriableError } from "inngest";
 
 async function failInsights(callId: string, error: unknown) {
@@ -19,7 +19,10 @@ export const finalizeCallJob = inngest.createFunction(
     id: "finalize-call",
     triggers: [{ event: EVENT_CALL_ENDED }],
     retries: 5,
-    concurrency: 2,
+    concurrency: [
+      { key: "event.data.callId", limit: 1 },
+      { limit: 2 },
+    ],
     onFailure: async ({ event, error }) => {
       const { callId } = failedEventData<{ callId: string }>(event);
       if (callId) await failInsights(callId, error);
@@ -69,39 +72,52 @@ export const finalizeCallJob = inngest.createFunction(
     }
 
     if (sessionId) {
-      await step.run("upsert-assembly-timeline", async () => {
-        const apiKey = process.env.ASSEMBLYAI_API_KEY;
-        if (!apiKey) return;
-        let lastError = "Timeline not ready.";
-        for (let i = 0; i < 6; i += 1) {
+      let lastError = "Timeline not ready.";
+      let turns: { speaker: "visitor" | "agent"; text: string }[] | null = null;
+      for (let i = 0; i < 6; i += 1) {
+        const result = await step.run(`fetch-timeline-${i}`, async () => {
+          const apiKey = process.env.ASSEMBLYAI_API_KEY;
+          if (!apiKey) return { kind: "skip" as const };
           try {
-            const result = await fetchSessionTimeline(sessionId, apiKey);
-            if (!result.ready) {
-              lastError = `Session ${result.status || "pending"}`;
-              await new Promise((resolve) => setTimeout(resolve, 2000));
-              continue;
+            const timeline = await fetchSessionTimeline(sessionId, apiKey);
+            if (!timeline.ready) {
+              return { kind: "wait" as const, error: `Session ${timeline.status || "pending"}` };
             }
-            if (result.turns.length === 0) return;
-            const db = getDb();
-            await db.delete(transcriptTurns).where(eq(transcriptTurns.callId, callId));
-            const chunkSize = 80;
-            for (let start = 0; start < result.turns.length; start += chunkSize) {
-              const chunk = result.turns.slice(start, start + chunkSize).map((turn, offset) => ({
-                callId,
-                seq: start + offset,
-                speaker: turn.speaker,
-                text: turn.text.slice(0, 8000),
-              }));
-              await db.insert(transcriptTurns).values(chunk);
-            }
-            return;
+            return { kind: "ok" as const, turns: timeline.turns };
           } catch (error) {
-            lastError = error instanceof Error ? error.message : "Timeline fetch failed.";
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            return {
+              kind: "wait" as const,
+              error: error instanceof Error ? error.message : "Timeline fetch failed.",
+            };
           }
+        });
+        if (result.kind === "skip") break;
+        if (result.kind === "ok") {
+          turns = result.turns;
+          break;
         }
+        lastError = result.error;
+        if (i < 5) await step.sleep(`wait-timeline-${i}`, "2s");
+      }
+
+      if (turns && turns.length > 0) {
+        await step.run("upsert-assembly-timeline", async () => {
+          const db = getDb();
+          await db.delete(transcriptTurns).where(eq(transcriptTurns.callId, callId));
+          const chunkSize = 80;
+          for (let start = 0; start < turns.length; start += chunkSize) {
+            const chunk = turns.slice(start, start + chunkSize).map((turn, offset) => ({
+              callId,
+              seq: start + offset,
+              speaker: turn.speaker,
+              text: turn.text.slice(0, 8000),
+            }));
+            await db.insert(transcriptTurns).values(chunk);
+          }
+        });
+      } else if (turns === null) {
         console.error(JSON.stringify({ msg: "call.timeline_unavailable", callId, lastError }));
-      });
+      }
     }
 
     await step.run("gemini-insights", async () => {
@@ -110,40 +126,44 @@ export const finalizeCallJob = inngest.createFunction(
   },
 );
 
-export const sweepStaleCallsJob = inngest.createFunction(
+export const closeOpenCallJob = inngest.createFunction(
   {
-    id: "sweep-stale-calls",
-    triggers: [{ cron: "0 0,12 * * *" }],
-    retries: 0,
+    id: "close-open-call",
+    triggers: [{ event: EVENT_CALL_STARTED }],
+    retries: 2,
+    cancelOn: [{ event: EVENT_CALL_ENDED, match: "data.callId" }],
   },
-  async ({ step }) => {
-    const stale = await step.run("find-stale-calls", async () => {
+  async ({ event, step }) => {
+    const { callId } = event.data as { callId: string };
+    const waitSeconds = CALL_SECONDS + Math.round(STALE_CALL_GRACE_MS / 1000);
+    await step.sleep("wait-call-window", `${waitSeconds}s`);
+
+    const closed = await step.run("close-if-open", async () => {
       const db = getDb();
-      const cutoff = new Date(Date.now() - CALL_SECONDS * 1000 - STALE_CALL_GRACE_MS);
-      return db
-        .select({ id: calls.id, startedAt: calls.startedAt })
+      const [call] = await db
+        .select({ id: calls.id, startedAt: calls.startedAt, endedAt: calls.endedAt })
         .from(calls)
-        .where(and(isNull(calls.endedAt), lt(calls.startedAt, cutoff)))
-        .limit(25);
+        .where(eq(calls.id, callId))
+        .limit(1);
+      if (!call || call.endedAt) return false;
+
+      const startedAt = new Date(call.startedAt);
+      const endedAt = new Date(startedAt.getTime() + CALL_SECONDS * 1000);
+      const updated = await db
+        .update(calls)
+        .set({
+          endedAt,
+          durationSeconds: CALL_SECONDS,
+          insightStatus: "pending",
+        })
+        .where(and(eq(calls.id, call.id), isNull(calls.endedAt)))
+        .returning({ id: calls.id });
+      return Boolean(updated[0]);
     });
 
-    for (const call of stale) {
-      await step.run(`close-${call.id}`, async () => {
-        const db = getDb();
-        const startedAt = new Date(call.startedAt);
-        const endedAt = new Date(startedAt.getTime() + CALL_SECONDS * 1000);
-        const updated = await db
-          .update(calls)
-          .set({
-            endedAt,
-            durationSeconds: CALL_SECONDS,
-            insightStatus: "pending",
-          })
-          .where(and(eq(calls.id, call.id), isNull(calls.endedAt)))
-          .returning({ id: calls.id });
-        if (updated[0]) {
-          await inngest.send({ name: EVENT_CALL_ENDED, data: { callId: call.id } });
-        }
+    if (closed) {
+      await step.run("emit-call-ended", async () => {
+        await inngest.send({ name: EVENT_CALL_ENDED, data: { callId } });
       });
     }
   },

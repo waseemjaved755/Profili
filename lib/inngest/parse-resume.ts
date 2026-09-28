@@ -47,7 +47,11 @@ export const parseResumeJob = inngest.createFunction(
     id: "parse-resume",
     triggers: [{ event: EVENT_RESUME_UPLOADED }],
     retries: 4,
-    concurrency: 2,
+    concurrency: [
+      { key: "event.data.profileId", limit: 1 },
+      { limit: 2 },
+    ],
+    singleton: { key: "event.data.profileId", mode: "cancel" },
     onFailure: async ({ event, error }) => {
       const { profileId } = failedEventData<{ profileId: string }>(event);
       if (profileId) await failParse(profileId, error);

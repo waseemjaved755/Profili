@@ -1,5 +1,7 @@
 import { getDb } from "@/lib/db/client";
 import { calls } from "@/lib/db/schema";
+import { EVENT_CALL_STARTED } from "@/lib/inngest/client";
+import { emitEvent } from "@/lib/inngest/emit";
 import { getPublishedProfile } from "@/lib/resume/public";
 import { profileJsonSchema, visitorSchema, voiceTokenBodySchema } from "@/lib/resume/schema";
 import { clientIp, hashIp } from "@/lib/voice/ip";
@@ -111,6 +113,12 @@ export async function POST(request: Request) {
     visitorName: visitor.name,
     visitorPurpose: visitor.purpose,
   });
+
+  try {
+    await emitEvent(EVENT_CALL_STARTED, { callId: call.id });
+  } catch (error) {
+    console.error(JSON.stringify({ msg: "call.start_emit_failed", callId: call.id, error: String(error) }));
+  }
 
   return NextResponse.json({
     token: token.token,

@@ -129,7 +129,7 @@ export default function PrivacyPage() {
           <li>Vercel: hosting and edge delivery.</li>
           <li>Google (Gemini and, if you choose it, Google sign-in).</li>
           <li>AssemblyAI: live speech to text and voice agent sessions.</li>
-          <li>Inngest: background jobs (resume parse, call finalize, stale-call sweep).</li>
+          <li>Inngest: background jobs (resume parse, call finalize, open-call close).</li>
         </ul>
         <p>
           Audio leaves the browser for AssemblyAI during a live call. Resume text

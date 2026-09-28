@@ -1,4 +1,4 @@
-/** Public voice-call length. Keep UI, AssemblyAI, prompts, and the stale-call sweeper in sync. */
+/** Public voice-call length. Keep UI, AssemblyAI, prompts, and close-open-call in sync. */
 export const CALL_SECONDS = 300;
 export const CALL_WRAP_SECONDS = 270;
 export const ASSEMBLY_MAX_SESSION_SECONDS = 320;
