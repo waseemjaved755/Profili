@@ -18,7 +18,7 @@ export function Features() {
       <div className="mx-auto max-w-7xl">
         <p className="label">Architecture</p>
         <h2 className="mt-3 max-w-3xl text-[36px] font-semibold tracking-tight text-ink sm:text-[48px]">
-          Grounded answers. Recruiter signal. A tuner you can hear.
+          Grounded answers. Visitor signal. A tuner you can hear.
         </h2>
         <div className="mt-10 grid gap-5 md:grid-cols-3">
           <div className="brutal-lg rounded-2xl p-5 md:col-span-2">
@@ -52,9 +52,9 @@ export function Features() {
           </div>
 
           <div className="brutal-lg overflow-hidden rounded-2xl">
-            <img src={visuals.recruiter} alt="" className="h-40 w-full object-cover" />
+            <img src={visuals.visitor} alt="" className="h-40 w-full object-cover" />
             <div className="p-5">
-              <h3 className="text-[20px] font-semibold tracking-tight">Recruiter intent</h3>
+              <h3 className="text-[20px] font-semibold tracking-tight">Visitor intent</h3>
               <p className="mt-3 flex justify-between font-mono text-[13px] text-steel">
                 <span>Acme · Staff Backend</span>
                 <span>4:12</span>

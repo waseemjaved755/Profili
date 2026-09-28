@@ -3,6 +3,8 @@ import { calls } from "@/lib/db/schema";
 import { getPublishedProfile } from "@/lib/resume/public";
 import { profileJsonSchema, visitorSchema, voiceTokenBodySchema } from "@/lib/resume/schema";
 import { clientIp, hashIp } from "@/lib/voice/ip";
+import { mintAssemblyToken } from "@/lib/voice/assembly-token";
+import { ASSEMBLY_MAX_SESSION_SECONDS, CALL_SECONDS } from "@/lib/voice/call-window";
 import { takeCallSlot } from "@/lib/voice/rate-limit";
 import { buildVoiceSessionConfig } from "@/lib/voice/session-config";
 import { eq } from "drizzle-orm";
@@ -88,7 +90,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Could not create the call record." }, { status: 500 });
   }
 
-  const token = await mintAssemblyToken(apiKey);
+  const token = await mintAssemblyToken(apiKey, [ASSEMBLY_MAX_SESSION_SECONDS, CALL_SECONDS]);
   if (!token.ok) {
     await db
       .update(calls)
@@ -116,27 +118,4 @@ export async function POST(request: Request) {
     transcriptToken: call.transcriptToken,
     sessionConfig,
   });
-}
-
-async function mintAssemblyToken(apiKey: string) {
-  for (const duration of [35, 60]) {
-    const tokenUrl = new URL("https://agents.assemblyai.com/v1/token");
-    tokenUrl.searchParams.set("expires_in_seconds", "60");
-    tokenUrl.searchParams.set("max_session_duration_seconds", String(duration));
-    const tokenResponse = await fetch(tokenUrl, {
-      headers: { Authorization: `Bearer ${apiKey}` },
-    });
-    if (!tokenResponse.ok) {
-      const detail = await tokenResponse.text();
-      if (duration === 35) continue;
-      return { ok: false as const, status: tokenResponse.status, detail };
-    }
-    const payload = (await tokenResponse.json()) as { token?: string };
-    if (!payload.token) {
-      if (duration === 35) continue;
-      return { ok: false as const, status: 502, detail: "AssemblyAI did not return a session token." };
-    }
-    return { ok: true as const, token: payload.token };
-  }
-  return { ok: false as const, status: 502, detail: "AssemblyAI did not return a session token." };
 }

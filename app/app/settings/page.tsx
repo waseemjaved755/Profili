@@ -7,6 +7,7 @@ import { useSession } from "@/lib/session";
 
 export default function SettingsPage() {
   const { user } = useSession();
+
   if (!user) return null;
 
   return (

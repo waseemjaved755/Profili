@@ -18,7 +18,7 @@ export async function GET() {
   const { data, error } = await auth.supabase
     .from("calls")
     .select(
-      "id, visitor_name, visitor_purpose, visitor_email, started_at, ended_at, duration_seconds, insight_status, insight_intent, insight_query, insight_summary, insight_citation, insight_grounded, insight_tone, insight_fit, insight_tone_label, insight_fit_label, assembly_session_id, transcript_turns ( seq, speaker, text, created_at )",
+      "id, visitor_name, visitor_purpose, visitor_email, started_at, ended_at, duration_seconds, insight_status, insight_intent, insight_query, insight_summary, insight_citation, insight_grounded, insight_tone, insight_fit, insight_tone_label, insight_fit_label, assembly_session_id, messages ( id )",
     )
     .eq("profile_id", profile.id)
     .not("ended_at", "is", null)
@@ -30,10 +30,11 @@ export async function GET() {
   }
 
   const calls = (data ?? []).map((row) => {
-    const turns = [...((row.transcript_turns as Array<{ seq: number }> | null) ?? [])].sort(
-      (a, b) => a.seq - b.seq,
-    );
-    return { ...row, transcript_turns: turns };
+    const left = Array.isArray(row.messages) ? row.messages.length > 0 : Boolean(row.messages);
+    return {
+      ...row,
+      left_message: left,
+    };
   });
 
   return NextResponse.json({ calls });

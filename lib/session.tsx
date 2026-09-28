@@ -147,7 +147,7 @@ export function SessionProvider({ children }: { children: React.ReactNode }) {
       return;
     }
     const { createClient } = await import("./supabase/client");
-    await createClient().auth.signOut();
+    await createClient().auth.signOut({ scope: "global" });
     setAuthUser(null);
     setUser(null);
   }, []);

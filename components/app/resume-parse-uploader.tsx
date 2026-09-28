@@ -16,8 +16,10 @@ type ParseStatus = "idle" | "parsing" | "ready" | "failed";
 
 export function ResumeParseUploader({
   onParsed,
+  compact = false,
 }: {
   onParsed: () => void;
+  compact?: boolean;
 }) {
   const reduce = useReducedMotion();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -175,7 +177,9 @@ export function ResumeParseUploader({
                 borderColor: drag ? "var(--accent)" : "var(--border)",
               }
         }
-        className="brutal relative flex min-h-[240px] w-full flex-col items-center justify-center overflow-hidden rounded-2xl px-6 py-12 text-center"
+        className={`brutal relative flex w-full cursor-pointer flex-col items-center justify-center overflow-hidden rounded-2xl px-6 text-center ${
+          compact ? "min-h-[160px] py-8" : "min-h-[240px] py-12"
+        }`}
       >
         <AnimatePresence mode="wait">
           {phase === "empty" ? (

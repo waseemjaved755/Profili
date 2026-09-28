@@ -22,8 +22,8 @@ export default function PrivacyPage() {
         <h2>Who this applies to</h2>
         <ul>
           <li>Visitors to the marketing site, including the waitlist.</li>
-          <li>People who create a Profili account (candidates).</li>
-          <li>People who talk to a published voice page (visitors / recruiters).</li>
+          <li>People who create a Profili account (professionals).</li>
+          <li>People who talk to a published voice page (visitors).</li>
         </ul>
       </section>
 

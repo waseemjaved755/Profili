@@ -44,7 +44,7 @@ export default function TermsPage() {
       <section>
         <h2>Public pages and embeds</h2>
         <p>
-          A published slug is reachable at /p/{"{slug}"} and can be embedded on
+          A published slug is reachable at /participant/{"{slug}"} and can be embedded on
           another site. Anyone with the link can start a voice call, subject to
           rate limits. You decide when a profile is published. Take it down if
           you no longer want it public.

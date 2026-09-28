@@ -3,6 +3,7 @@ import { calls, transcriptTurns } from "@/lib/db/schema";
 import { EVENT_CALL_ENDED, inngest } from "@/lib/inngest/client";
 import { failedEventData } from "@/lib/inngest/emit";
 import { fetchSessionTimeline } from "@/lib/voice/assembly-session";
+import { CALL_SECONDS, STALE_CALL_GRACE_MS } from "@/lib/voice/call-window";
 import { generateCallInsights } from "@/lib/voice/insights";
 import { and, eq, isNull, lt } from "drizzle-orm";
 import { NonRetriableError } from "inngest";
@@ -82,20 +83,16 @@ export const finalizeCallJob = inngest.createFunction(
             }
             if (result.turns.length === 0) return;
             const db = getDb();
-            for (let seq = 0; seq < result.turns.length; seq += 1) {
-              const turn = result.turns[seq]!;
-              await db
-                .insert(transcriptTurns)
-                .values({
-                  callId,
-                  seq,
-                  speaker: turn.speaker,
-                  text: turn.text,
-                })
-                .onConflictDoUpdate({
-                  target: [transcriptTurns.callId, transcriptTurns.seq],
-                  set: { speaker: turn.speaker, text: turn.text },
-                });
+            await db.delete(transcriptTurns).where(eq(transcriptTurns.callId, callId));
+            const chunkSize = 80;
+            for (let start = 0; start < result.turns.length; start += chunkSize) {
+              const chunk = result.turns.slice(start, start + chunkSize).map((turn, offset) => ({
+                callId,
+                seq: start + offset,
+                speaker: turn.speaker,
+                text: turn.text.slice(0, 8000),
+              }));
+              await db.insert(transcriptTurns).values(chunk);
             }
             return;
           } catch (error) {
@@ -122,7 +119,7 @@ export const sweepStaleCallsJob = inngest.createFunction(
   async ({ step }) => {
     const stale = await step.run("find-stale-calls", async () => {
       const db = getDb();
-      const cutoff = new Date(Date.now() - 90_000);
+      const cutoff = new Date(Date.now() - CALL_SECONDS * 1000 - STALE_CALL_GRACE_MS);
       return db
         .select({ id: calls.id, startedAt: calls.startedAt })
         .from(calls)
@@ -134,12 +131,12 @@ export const sweepStaleCallsJob = inngest.createFunction(
       await step.run(`close-${call.id}`, async () => {
         const db = getDb();
         const startedAt = new Date(call.startedAt);
-        const endedAt = new Date(startedAt.getTime() + 30_000);
+        const endedAt = new Date(startedAt.getTime() + CALL_SECONDS * 1000);
         const updated = await db
           .update(calls)
           .set({
             endedAt,
-            durationSeconds: 30,
+            durationSeconds: CALL_SECONDS,
             insightStatus: "pending",
           })
           .where(and(eq(calls.id, call.id), isNull(calls.endedAt)))

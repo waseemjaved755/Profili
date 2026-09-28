@@ -1,8 +1,52 @@
+import { requireUser } from "@/lib/auth/require-user";
 import { getDb } from "@/lib/db/client";
 import { calls, transcriptTurns } from "@/lib/db/schema";
 import { voiceTranscriptBodySchema } from "@/lib/resume/schema";
-import { and, eq } from "drizzle-orm";
+import { and, asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
+
+export async function GET(request: Request) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
+
+  const callId = new URL(request.url).searchParams.get("callId");
+  if (!callId) {
+    return NextResponse.json({ error: "Missing call." }, { status: 400 });
+  }
+
+  const { data: profile } = await auth.supabase
+    .from("profiles")
+    .select("id")
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+  if (!profile) {
+    return NextResponse.json({ error: "Call not found." }, { status: 404 });
+  }
+
+  const { data: call } = await auth.supabase
+    .from("calls")
+    .select("id")
+    .eq("id", callId)
+    .eq("profile_id", profile.id)
+    .maybeSingle();
+  if (!call) {
+    return NextResponse.json({ error: "Call not found." }, { status: 404 });
+  }
+
+  const db = getDb();
+  const turns = await db
+    .select({
+      seq: transcriptTurns.seq,
+      speaker: transcriptTurns.speaker,
+      text: transcriptTurns.text,
+    })
+    .from(transcriptTurns)
+    .where(eq(transcriptTurns.callId, callId))
+    .orderBy(asc(transcriptTurns.seq))
+    .limit(4000);
+
+  return NextResponse.json({ turns });
+}
 
 export async function POST(request: Request) {
   if (!process.env.DATABASE_URL) {

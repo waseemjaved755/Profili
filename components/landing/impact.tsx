@@ -6,8 +6,8 @@ import Link from "next/link";
 
 const thread = [
   {
-    who: "Recruiter",
-    photo: visuals.recruiter,
+    who: "Visitor",
+    photo: visuals.visitor,
     text: "Walk me through your hardest production incident.",
   },
   {
@@ -50,7 +50,7 @@ export function Impact() {
               href="/talk/waseem"
               className="inline-flex rounded-lg bg-btn px-5 py-2.5 text-sm font-medium text-btn-fg shadow-sm transition-all duration-150 hover:bg-btn-hover"
             >
-              Open the live candidate →
+              Open the live example →
             </Link>
           </div>
         </div>

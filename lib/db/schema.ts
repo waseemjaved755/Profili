@@ -127,6 +127,30 @@ export const transcriptTurns = pgTable(
   ],
 );
 
+export const messages = pgTable(
+  "messages",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    callId: uuid("call_id")
+      .notNull()
+      .unique()
+      .references(() => calls.id, { onDelete: "cascade" }),
+    profileId: uuid("profile_id")
+      .notNull()
+      .references(() => profiles.id, { onDelete: "cascade" }),
+    body: text("body").notNull(),
+    intent: text("intent"),
+    visitorName: text("visitor_name").notNull(),
+    visitorEmail: text("visitor_email").notNull(),
+    createdAt: timestamp("created_at", { withTimezone: true }).notNull().defaultNow(),
+    notifiedAt: timestamp("notified_at", { withTimezone: true }),
+    readAt: timestamp("read_at", { withTimezone: true }),
+  },
+  (table) => [
+    index("messages_profile_created_idx").on(table.profileId, table.createdAt),
+  ],
+);
+
 export type UserRow = typeof users.$inferSelect;
 export type ProfileRow = typeof profiles.$inferSelect;
 export type CallRow = typeof calls.$inferSelect;

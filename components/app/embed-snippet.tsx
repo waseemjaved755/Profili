@@ -1,7 +1,7 @@
 "use client";
 
-import { MagneticButton } from "@/components/motion/magnetic-button";
 import { embedIframeSnippet, embedScriptSnippet } from "@/lib/site";
+import { Check, Copy } from "lucide-react";
 import { useState } from "react";
 
 export function EmbedSnippet({ slug }: { slug: string }) {
@@ -9,8 +9,14 @@ export function EmbedSnippet({ slug }: { slug: string }) {
   const [copied, setCopied] = useState(false);
   const code = tab === "iframe" ? embedIframeSnippet(slug) : embedScriptSnippet(slug);
 
+  async function copy() {
+    await navigator.clipboard.writeText(code);
+    setCopied(true);
+    window.setTimeout(() => setCopied(false), 1600);
+  }
+
   return (
-    <div className="mt-10 max-w-xl rounded-2xl border border-border bg-surface p-5">
+    <section className="flex h-full flex-col rounded-2xl border border-border bg-surface p-5">
       <p className="label">Add to your site</p>
       <p className="mt-2 text-[14px] text-muted">
         Paste this into any page. Visitors talk to your agent without leaving your site.
@@ -35,21 +41,19 @@ export function EmbedSnippet({ slug }: { slug: string }) {
           Script
         </button>
       </div>
-      <pre className="mt-4 overflow-x-auto rounded-lg bg-subtle p-3 font-mono text-[12px] leading-relaxed">
-        {code}
-      </pre>
-      <div className="mt-4">
-        <MagneticButton
-          variant="secondary"
-          onClick={async () => {
-            await navigator.clipboard.writeText(code);
-            setCopied(true);
-            window.setTimeout(() => setCopied(false), 1600);
-          }}
+      <div className="relative mt-4 min-h-0 flex-1">
+        <pre className="h-full overflow-x-auto rounded-lg bg-subtle p-3 pr-12 font-mono text-[12px] leading-relaxed">
+          {code}
+        </pre>
+        <button
+          type="button"
+          aria-label={copied ? "Copied snippet" : "Copy snippet"}
+          onClick={() => void copy()}
+          className="absolute top-2 right-2 grid h-9 w-9 place-items-center rounded-lg border border-border bg-surface text-ink transition-colors hover:border-steel/40 hover:bg-subtle"
         >
-          {copied ? "Copied" : "Copy snippet"}
-        </MagneticButton>
+          {copied ? <Check size={15} strokeWidth={2.4} /> : <Copy size={15} strokeWidth={2.4} />}
+        </button>
       </div>
-    </div>
+    </section>
   );
 }

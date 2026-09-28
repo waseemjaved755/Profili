@@ -15,6 +15,8 @@ export type Visitor = {
   citation: string;
   toneLabel: string;
   fitLabel: string;
+  email: string;
+  leftMessage?: boolean;
 };
 
 export const VISITORS: Visitor[] = [
@@ -24,7 +26,7 @@ export const VISITORS: Visitor[] = [
     alt: "Claire Bennett",
     title: "Claire Bennett",
     description: "Asked about the Postgres cutover and replica lag.",
-    intent: "Recruiter",
+    intent: "Visitor",
     tone: 86,
     clarity: 91,
     grounded: 94,
@@ -37,6 +39,8 @@ export const VISITORS: Visitor[] = [
     citation: "CV Page 2: Infrastructure",
     toneLabel: "Direct & Technical",
     fitLabel: "High relevance match",
+    email: "claire.bennett@northstar.hire",
+    leftMessage: true,
   },
   {
     id: "jordan",
@@ -56,6 +60,7 @@ export const VISITORS: Visitor[] = [
     citation: "CV Page 1: Backend",
     toneLabel: "Peer-level, precise",
     fitLabel: "Strong technical match",
+    email: "justin.hale@peermail.dev",
   },
   {
     id: "amelia",
@@ -75,6 +80,8 @@ export const VISITORS: Visitor[] = [
     citation: "CV Page 3: Leadership",
     toneLabel: "Calm, hiring-ready",
     fitLabel: "Loop-ready signal",
+    email: "amelia.brooks@lattice.jobs",
+    leftMessage: true,
   },
   {
     id: "luis",
@@ -94,6 +101,7 @@ export const VISITORS: Visitor[] = [
     citation: "CV Page 1: Impact",
     toneLabel: "Blunt, metric-first",
     fitLabel: "Founder-screen fit",
+    email: "louis.carter@foundry.co",
   },
   {
     id: "nina",
@@ -101,7 +109,7 @@ export const VISITORS: Visitor[] = [
     alt: "Nina Walsh",
     title: "Nina Walsh",
     description: "Asked how the voice stays inside the CV.",
-    intent: "Recruiter",
+    intent: "Visitor",
     tone: 90,
     clarity: 85,
     grounded: 97,
@@ -113,6 +121,7 @@ export const VISITORS: Visitor[] = [
     citation: "CV Page 1: Scope",
     toneLabel: "Direct & Technical",
     fitLabel: "High relevance match",
+    email: "nina.walsh@recruit.team",
   },
   {
     id: "owen",
@@ -132,6 +141,7 @@ export const VISITORS: Visitor[] = [
     citation: "CV Page 2: AWS",
     toneLabel: "Dry, systems-first",
     fitLabel: "Deep technical match",
+    email: "owen.park@systems.dev",
   },
   {
     id: "sara",
@@ -151,6 +161,7 @@ export const VISITORS: Visitor[] = [
     citation: "CV Page 3: On-call",
     toneLabel: "Clear under pressure",
     fitLabel: "Manager-loop fit",
+    email: "sara.lind@hireloop.com",
   },
   {
     id: "dev",
@@ -158,7 +169,7 @@ export const VISITORS: Visitor[] = [
     alt: "Ryan Cole",
     title: "Ryan Cole",
     description: "Asked for a walkthrough of the last production incident.",
-    intent: "Recruiter",
+    intent: "Visitor",
     tone: 83,
     clarity: 90,
     grounded: 95,
@@ -170,5 +181,6 @@ export const VISITORS: Visitor[] = [
     citation: "CV Page 2: Incidents",
     toneLabel: "Direct & Technical",
     fitLabel: "High relevance match",
+    email: "ryan.cole@search.jobs",
   },
 ];

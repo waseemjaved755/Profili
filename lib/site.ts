@@ -14,11 +14,11 @@ export function siteOrigin() {
 }
 
 export function publicProfileUrl(slug: string, origin = siteOrigin()) {
-  return `${origin}/p/${slug}`;
+  return `${origin}/participant/${slug}`;
 }
 
 export function publicProfilePath(slug: string) {
-  return `/p/${slug}`;
+  return `/participant/${slug}`;
 }
 
 export function embedProfileUrl(slug: string, origin = siteOrigin()) {

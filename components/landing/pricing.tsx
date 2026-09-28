@@ -1,128 +1,168 @@
 "use client";
 
-import { CircleCheck, Mic, Sparkles } from "lucide-react";
+import { ScrollReveal, StaggerContainer, StaggerItem } from "@/components/motion/reveal";
+import {
+  CONTACT_EMAIL,
+  planCta,
+  planPrice,
+  plans,
+  pricingCopy,
+  pricingFaqs,
+  type BillingPeriod,
+} from "@/lib/pricing";
+import { Check } from "lucide-react";
 import Link from "next/link";
-import type { LucideIcon } from "lucide-react";
-
-type Plan = {
-  name: string;
-  audience: string;
-  price: string;
-  period: string;
-  icon: LucideIcon;
-  features: string[];
-  cta: string;
-  popular?: boolean;
-};
-
-const plans: Plan[] = [
-  {
-    name: "Free",
-    audience: "Ship your first voice agent",
-    price: "$0",
-    period: "/month",
-    icon: Mic,
-    features: [
-      "One voice agent",
-      "Resume-grounded answers",
-      "Public talk link",
-      "Tone tuner",
-    ],
-    cta: "Get Started",
-  },
-  {
-    name: "Pro",
-    audience: "For recruiters who want the full signal",
-    price: "$19",
-    period: "/month",
-    icon: Sparkles,
-    features: [
-      "Everything in Free",
-      "Unlimited voice minutes",
-      "Custom domain",
-      "Query analytics",
-      "Multiple agents",
-    ],
-    cta: "Get Started",
-    popular: true,
-  },
-];
+import { useState } from "react";
 
 export function Pricing() {
+  const [period, setPeriod] = useState<BillingPeriod>("monthly");
+
+  function onBillingKey(event: React.KeyboardEvent<HTMLDivElement>) {
+    if (event.key !== "ArrowLeft" && event.key !== "ArrowRight" && event.key !== "ArrowUp" && event.key !== "ArrowDown") {
+      return;
+    }
+    event.preventDefault();
+    setPeriod((current) => (current === "monthly" ? "annual" : "monthly"));
+  }
+
   return (
-    <section id="pricing" className="px-4 py-16 sm:px-6">
-      <div className="mx-auto max-w-7xl">
-        <h2 className="text-center text-[36px] font-semibold tracking-tight text-ink sm:text-[52px]">
-          Simple pricing. Serious talent.
-        </h2>
-        <div className="mx-auto mt-12 grid max-w-3xl gap-6 md:grid-cols-2">
+    <section id="pricing" className="scroll-mt-20 px-4 py-16 sm:px-6 sm:py-20">
+      <div className="mx-auto max-w-6xl">
+        <ScrollReveal>
+          <p className="label">{pricingCopy.eyebrow}</p>
+          <h2 className="mt-3 max-w-3xl text-[36px] font-semibold tracking-tight text-ink sm:text-[52px]">
+            {pricingCopy.heading}
+          </h2>
+          <p className="mt-4 max-w-2xl text-[16px] text-ink/80">{pricingCopy.subhead}</p>
+        </ScrollReveal>
+
+        <div className="mt-8 flex justify-center sm:mt-10">
+          <div
+            role="radiogroup"
+            aria-label="Billing period"
+            className="inline-flex rounded-lg border border-border bg-surface p-1"
+            onKeyDown={onBillingKey}
+          >
+            {(
+              [
+                ["monthly", "Monthly"],
+                ["annual", "Annual"],
+              ] as const
+            ).map(([id, label]) => {
+              const checked = period === id;
+              return (
+                <button
+                  key={id}
+                  type="button"
+                  role="radio"
+                  aria-checked={checked}
+                  tabIndex={checked ? 0 : -1}
+                  onClick={() => setPeriod(id)}
+                  className={`rounded-md px-4 py-2 text-[13px] font-medium transition-colors ${
+                    checked ? "bg-subtle text-ink" : "text-muted hover:text-ink"
+                  }`}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        <StaggerContainer className="mt-10 grid gap-4 sm:mt-12 md:grid-cols-3">
           {plans.map((plan) => {
-            const Icon = plan.icon;
+            const price = planPrice(plan, period);
+            const cta = planCta(plan);
             return (
-              <article
-                key={plan.name}
-                className="relative flex flex-col rounded-2xl border border-border bg-surface p-7 shadow-[var(--shadow-lg)] transition-colors duration-200 hover:border-steel/40"
-              >
-                {plan.popular && (
-                  <span className="absolute right-5 top-5 rounded-full border border-border bg-subtle px-2.5 py-1 font-mono text-[11px] font-medium text-navy">
-                    Popular
-                  </span>
-                )}
-
-                <span
-                  className={`grid h-10 w-10 place-items-center rounded-lg border border-border ${
-                    plan.popular ? "bg-subtle" : "bg-surface"
+              <StaggerItem key={plan.id} className={`flex ${plan.orderClassName}`}>
+                <article
+                  className={`flex h-full w-full flex-col rounded-xl border bg-surface p-5 sm:p-6 ${
+                    plan.highlighted ? "border-ink" : "border-border"
                   }`}
                 >
-                  <Icon size={18} strokeWidth={1.8} className="text-ink" />
-                </span>
-
-                <h3 className="mt-5 text-[24px] font-semibold tracking-tight text-ink">
-                  {plan.name}
-                </h3>
-                <p className="mt-2 text-[14px] text-muted">
-                  {plan.audience}
-                </p>
-
-                <p className="mt-6 flex items-end gap-1">
-                  <span className="text-[48px] font-semibold leading-none tracking-tight text-ink">
-                    {plan.price}
-                  </span>
-                  <span className="mb-1.5 font-mono text-[13px] text-steel">
-                    {plan.period}
-                  </span>
-                </p>
-
-                <ul className="mt-6 mb-8 flex-1 space-y-3">
-                  {plan.features.map((item) => (
-                    <li
-                      key={item}
-                      className="flex items-start gap-2.5 text-[15px] text-ink"
-                    >
-                      <CircleCheck
-                        size={18}
-                        strokeWidth={1.8}
-                        className="mt-0.5 shrink-0 text-cerulean"
-                      />
-                      {item}
-                    </li>
-                  ))}
-                </ul>
-
-                <Link
-                  href="/signup"
-                  className={`mt-auto flex h-11 w-full items-center justify-center rounded-lg text-sm font-medium transition-all duration-150 active:scale-[0.98] ${
-                    plan.popular
-                      ? "bg-btn text-btn-fg shadow-sm hover:bg-btn-hover"
-                      : "border border-border bg-surface text-ink hover:border-steel/40"
-                  }`}
-                >
-                  {plan.cta}
-                </Link>
-              </article>
+                  <div className="flex items-start justify-between gap-3">
+                    <p className="text-[15px] font-semibold text-ink">{plan.name}</p>
+                    {plan.tag ? (
+                      <span className="rounded-full bg-ink px-2.5 py-1 font-mono text-[10px] font-medium tracking-wide text-btn-fg uppercase">
+                        {plan.tag}
+                      </span>
+                    ) : null}
+                  </div>
+                  <p className="mt-4 flex items-baseline gap-1 text-ink">
+                    <span className="text-[40px] font-semibold tracking-tight tabular-nums">${price.amount}</span>
+                    <span className="text-[14px] text-muted">{price.suffix}</span>
+                  </p>
+                  {price.note ? (
+                    <p className="mt-1 font-mono text-[11px] font-medium text-[#2A6F97] dark:text-ice">{price.note}</p>
+                  ) : (
+                    <p className="mt-1 h-[17px]" aria-hidden />
+                  )}
+                  <p className="mt-3 text-[15px] text-ink/80">{plan.tagline}</p>
+                  <ul className="mt-5 flex-1 space-y-2.5">
+                    {plan.features.map((feature) => (
+                      <li key={feature} className="flex items-start gap-2 text-[14px] text-ink">
+                        <Check
+                          size={16}
+                          strokeWidth={2.4}
+                          className="mt-0.5 shrink-0 text-[#2A6F97] dark:text-ice"
+                          aria-hidden
+                        />
+                        <span>{feature}</span>
+                      </li>
+                    ))}
+                  </ul>
+                  <Link
+                    href={cta.href}
+                    className={`mt-6 inline-flex min-h-11 items-center justify-center rounded-lg px-4 text-[14px] font-medium transition-all duration-150 ${
+                      plan.highlighted
+                        ? "bg-btn text-btn-fg hover:bg-btn-hover"
+                        : "border border-border bg-surface text-ink hover:border-steel/40 hover:bg-subtle"
+                    }`}
+                  >
+                    {cta.label}
+                  </Link>
+                </article>
+              </StaggerItem>
             );
           })}
+        </StaggerContainer>
+
+        <p className="mt-6 text-center text-[13px] text-muted">{pricingCopy.footnote}</p>
+        <div className="mt-8 space-y-1.5 text-center text-[14px] text-muted">
+          <p>{pricingCopy.topup}</p>
+          <p>
+            {pricingCopy.teams.split("contact us")[0]}
+            <a
+              href={`mailto:${CONTACT_EMAIL}`}
+              className="font-medium text-ink underline underline-offset-4 hover:text-navy"
+            >
+              contact us
+            </a>
+          </p>
         </div>
+
+        <ScrollReveal className="mx-auto mt-14 max-w-2xl" delay={0.08}>
+          <ul className="divide-y divide-border border-y border-border">
+            {pricingFaqs.map((item) => (
+              <li key={item.q}>
+                <details className="group py-3">
+                  <summary className="cursor-pointer list-none text-[15px] font-medium text-ink marker:content-none [&::-webkit-details-marker]:hidden">
+                    <span className="flex items-center justify-between gap-4">
+                      {item.q}
+                      <span aria-hidden className="text-muted group-open:hidden">
+                        +
+                      </span>
+                      <span aria-hidden className="hidden text-muted group-open:inline">
+                        −
+                      </span>
+                    </span>
+                  </summary>
+                  <p className="mt-2 pr-8 text-[14px] leading-relaxed text-ink/80">{item.a}</p>
+                </details>
+              </li>
+            ))}
+          </ul>
+        </ScrollReveal>
       </div>
     </section>
   );

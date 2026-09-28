@@ -4,14 +4,14 @@ import { MagneticButton } from "@/components/motion/magnetic-button";
 import { Field } from "@/components/ui/field";
 import { VoiceOrb } from "@/components/ui/voice-orb";
 import type { VoiceState } from "@/lib/motion";
+import { CALL_SECONDS, formatCallClock } from "@/lib/voice/call-window";
+import { buildToolResult, type ToolCallEvent } from "@/lib/voice/tool-result";
 import { useEffect, useRef, useState } from "react";
 
 type SessionConfig = {
   type: "session.update";
   session: Record<string, unknown>;
 };
-
-const CALL_SECONDS = 30;
 
 export function PublicVoiceCall({
   slug,
@@ -50,6 +50,13 @@ export function PublicVoiceCall({
   const [captions, setCaptions] = useState<Array<{ speaker: "visitor" | "agent"; text: string }>>(
     [],
   );
+  const [bargeInFlash, setBargeInFlash] = useState(false);
+
+  const pendingToolResults = useRef<Array<Promise<{ event: ToolCallEvent; result: unknown }>>>([]);
+  const lastWsEventRef = useRef<string | null>(null);
+  const sessionEndedRef = useRef(false);
+  const toolsInFlightRef = useRef(0);
+  const waitingOnToolsRef = useRef(false);
 
   useEffect(() => {
     return () => {
@@ -78,6 +85,11 @@ export function PublicVoiceCall({
       window.removeEventListener("beforeunload", beaconEnd);
     };
   }, []);
+
+  function markBargeIn() {
+    setBargeInFlash(true);
+    window.setTimeout(() => setBargeInFlash(false), 2800);
+  }
 
   function flushPlayback() {
     sourcesRef.current.forEach((source) => {
@@ -139,7 +151,7 @@ export function PublicVoiceCall({
     setCaptions((current) => {
       const last = current[current.length - 1];
       if (last && last.speaker === speaker && last.text === trimmed) return current;
-      return [...current, { speaker, text: trimmed }].slice(-8);
+      return [...current, { speaker, text: trimmed }].slice(-20);
     });
     const seq = seqRef.current;
     seqRef.current += 1;
@@ -167,9 +179,75 @@ export function PublicVoiceCall({
     }
   }
 
+  async function runToolCall(event: ToolCallEvent) {
+    const callId = callIdRef.current;
+    const transcriptToken = transcriptTokenRef.current;
+    if (!callId || !transcriptToken || !event.name) {
+      return { event, result: { ok: false, message: "Call is not active." } };
+    }
+    const controller = new AbortController();
+    const timer = window.setTimeout(() => controller.abort(), 4000);
+    try {
+      const response = await fetch("/api/voice/tool", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        signal: controller.signal,
+        body: JSON.stringify({
+          callId,
+          transcriptToken,
+          name: event.name,
+          arguments: event.arguments ?? {},
+        }),
+      });
+      const payload = (await response.json().catch(() => ({}))) as {
+        ok?: boolean;
+        message?: string;
+        error?: string;
+      };
+      if (!response.ok) {
+        return { event, result: { ok: false, message: payload.error || payload.message || "Tool failed." } };
+      }
+      return { event, result: payload };
+    } catch {
+      return { event, result: { ok: false, message: "Tool timed out." } };
+    } finally {
+      window.clearTimeout(timer);
+    }
+  }
+
+  async function flushToolsIfIdle(ws: WebSocket) {
+    if (lastWsEventRef.current !== "reply.done") return;
+    if (!pendingToolResults.current.length) return;
+    const batch = pendingToolResults.current.splice(0, pendingToolResults.current.length);
+    const settled = await Promise.all(batch);
+    if (ws.readyState !== WebSocket.OPEN) return;
+    for (const item of settled) {
+      ws.send(JSON.stringify(buildToolResult(item.event, item.result)));
+    }
+    if (waitingOnToolsRef.current && toolsInFlightRef.current <= 0 && !pendingToolResults.current.length) {
+      waitingOnToolsRef.current = false;
+      void finish("timer");
+    }
+  }
+
+  function handleToolCall(event: ToolCallEvent, ws: WebSocket) {
+    toolsInFlightRef.current += 1;
+    const work = runToolCall(event).finally(() => {
+      toolsInFlightRef.current = Math.max(0, toolsInFlightRef.current - 1);
+    });
+    pendingToolResults.current.push(work);
+    void work.then(() => flushToolsIfIdle(ws));
+  }
+
   async function startCall() {
     setError("");
     endingRef.current = false;
+    sessionEndedRef.current = false;
+    waitingOnToolsRef.current = false;
+    pendingToolResults.current = [];
+    lastWsEventRef.current = null;
+    toolsInFlightRef.current = 0;
+    setBargeInFlash(false);
     setRemaining(CALL_SECONDS);
 
     try {
@@ -257,6 +335,10 @@ export function PublicVoiceCall({
           transcript?: string;
           session_id?: string;
           sessionId?: string;
+          name?: string;
+          call_id?: string;
+          tool_call_id?: string;
+          arguments?: unknown;
           turn?: { transcript?: string };
         };
         readTurn(msg);
@@ -281,22 +363,41 @@ export function PublicVoiceCall({
         } else if (msg.type === "reply.audio" && msg.data) {
           setVoice("speaking");
           playPcm(msg.data, audioCtx);
+        } else if (msg.type === "tool.call") {
+          handleToolCall(msg, ws);
+        } else if (msg.type === "input.speech.started") {
+          lastWsEventRef.current = msg.type;
+          if (voiceRef.current === "speaking") {
+            flushPlayback();
+            setVoice("listening");
+            markBargeIn();
+          }
+        } else if (msg.type === "reply.started") {
+          lastWsEventRef.current = msg.type;
         } else if (msg.type === "reply.done" && msg.status === "interrupted") {
+          lastWsEventRef.current = msg.type;
+          pendingToolResults.current = [];
           flushPlayback();
           setVoice("listening");
+          markBargeIn();
         } else if (msg.type === "reply.done") {
+          lastWsEventRef.current = msg.type;
           if (msg.transcript || msg.text) saveTurn("agent", msg.transcript || msg.text || "");
           setVoice("listening");
+          void flushToolsIfIdle(ws);
         } else if (msg.type === "session.ended") {
-          void finish();
+          sessionEndedRef.current = true;
+          void finish("session");
         } else if (msg.type === "session.error" || msg.type === "error") {
           setError(msg.message || "The voice session failed.");
-          void finish();
+          sessionEndedRef.current = true;
+          void finish("session");
         }
       });
 
       ws.addEventListener("close", () => {
-        void finish();
+        sessionEndedRef.current = true;
+        void finish("session");
       });
 
       setStep("call");
@@ -338,7 +439,11 @@ export function PublicVoiceCall({
     };
   }
 
-  async function finish() {
+  async function finish(reason: "user" | "timer" | "session" = "user") {
+    if (reason === "timer" && !sessionEndedRef.current && (toolsInFlightRef.current > 0 || pendingToolResults.current.length > 0)) {
+      waitingOnToolsRef.current = true;
+      return;
+    }
     if (step === "ended") return;
     await teardown(true);
     setVoice("idle");
@@ -382,7 +487,7 @@ export function PublicVoiceCall({
       setRemaining((value) => {
         if (value <= 1) {
           window.clearInterval(id);
-          void finish();
+          void finish("timer");
           return 0;
         }
         return value - 1;
@@ -423,8 +528,18 @@ export function PublicVoiceCall({
           level={level}
           name={fullName.split(" ")[0] || "Voice agent"}
         />
-        <p className="mt-6 font-mono text-[28px] tabular-nums">{remaining}s</p>
+        <p className="mt-6 font-mono text-[28px] tabular-nums">{formatCallClock(remaining)}</p>
         <p className="mt-2 text-[15px] text-muted">{indicator}</p>
+        {voice === "speaking" ? (
+          <p className="mt-2 max-w-sm text-[13px] text-ink">
+            Talk over them to cut them off. Watch the voice stop mid-sentence.
+          </p>
+        ) : null}
+        {bargeInFlash ? (
+          <p className="mt-2 rounded-full border border-border bg-subtle px-3 py-1 font-mono text-[12px] text-navy">
+            Interrupted · reply.done
+          </p>
+        ) : null}
         {captions.length > 0 ? (
           <ul className="mt-6 w-full max-w-md space-y-2 text-left text-[13px]">
             {captions.map((line, index) => (
@@ -436,7 +551,7 @@ export function PublicVoiceCall({
           </ul>
         ) : null}
         <div className="mt-8">
-          <MagneticButton variant="secondary" onClick={() => void finish()}>
+          <MagneticButton variant="secondary" onClick={() => void finish("user")}>
             End call
           </MagneticButton>
         </div>
@@ -453,7 +568,7 @@ export function PublicVoiceCall({
       }}
     >
       <p className="text-center text-[15px] text-muted">
-        You&apos;re talking to an AI. Calls are limited to 30 seconds and may be recorded.
+        You&apos;re talking to an AI. Talk over it to interrupt. Calls last 5 minutes and may be recorded.
       </p>
       <Field
         label="Name"

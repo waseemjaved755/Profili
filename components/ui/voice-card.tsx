@@ -1,7 +1,7 @@
 "use client";
 
 import { VoiceWaveform } from "@/components/ui/voice-waveform";
-import type { Voice } from "@/lib/types";
+import type { AssemblyVoice } from "@/lib/voice/assembly-voices";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
 import { Check, Play } from "lucide-react";
 
@@ -11,7 +11,7 @@ export function VoiceCard({
   playing,
   onSelect,
 }: {
-  voice: Voice;
+  voice: AssemblyVoice;
   selected: boolean;
   playing: boolean;
   onSelect: () => void;
@@ -32,10 +32,16 @@ export function VoiceCard({
     >
       <div className="flex items-start justify-between gap-3">
         <div>
-          <p className="text-[20px] font-medium tracking-tight">{voice.name}</p>
-          <p className="mt-1 text-[13px] text-muted">{voice.personality}</p>
+          <p className="text-[20px] font-medium tracking-tight">{voice.label}</p>
+          <p className="mt-1 text-[13px] text-muted">
+            {voice.accent} · {voice.blurb}
+          </p>
         </div>
         <div className="flex items-center gap-2">
+          <span className="label flex items-center gap-1">
+            <Play size={10} />
+            {playing ? "Playing" : "Preview"}
+          </span>
           <AnimatePresence>
             {selected && (
               <motion.span
@@ -49,24 +55,14 @@ export function VoiceCard({
               </motion.span>
             )}
           </AnimatePresence>
-          <motion.span
-            className="label flex items-center gap-1"
-            whileHover={{ x: 3 }}
-          >
-            <Play size={10} />
-            {playing ? "Playing" : "Preview"}
-          </motion.span>
         </div>
       </div>
       <motion.div
         initial={false}
-        animate={{ opacity: selected || playing ? 1 : 0.35, y: playing ? 0 : 4 }}
+        animate={{ opacity: selected ? 1 : 0.35 }}
         className="mt-6"
       >
-        <VoiceWaveform
-          state={playing ? "speaking" : selected ? "idle" : "idle"}
-          compact
-        />
+        <VoiceWaveform state={playing ? "speaking" : selected ? "idle" : "idle"} compact />
       </motion.div>
     </motion.button>
   );

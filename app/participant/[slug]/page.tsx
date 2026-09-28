@@ -2,6 +2,7 @@ import { PublicVoiceCall } from "@/components/talk/public-voice-call";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
 import { getPublishedCard, getPublishedShare } from "@/lib/resume/public";
 import { noIndex, SITE_DESCRIPTION, SITE_TITLE, truncateMeta } from "@/lib/seo";
+import { publicProfilePath } from "@/lib/site";
 import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
@@ -38,7 +39,7 @@ export async function generateMetadata({
     openGraph: {
       title,
       description,
-      url: `/p/${slug}`,
+      url: publicProfilePath(slug),
       type: "website",
       siteName: "Profili",
     },
@@ -50,7 +51,7 @@ export async function generateMetadata({
   };
 }
 
-export default async function PublicProfilePage({
+export default async function ParticipantPage({
   params,
   searchParams,
 }: {

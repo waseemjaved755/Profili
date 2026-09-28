@@ -8,7 +8,7 @@ export const alt = "Profili: Your resume can talk";
 export const size = { width: 1200, height: 630 };
 export const contentType = "image/png";
 
-export default async function ProfileOpenGraphImage({
+export default async function ParticipantOpenGraphImage({
   params,
 }: {
   params: Promise<{ slug: string }>;

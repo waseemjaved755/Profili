@@ -1,10 +1,10 @@
 "use client";
 
 import { MagneticButton } from "@/components/motion/magnetic-button";
-import { VoiceWaveform } from "@/components/ui/voice-waveform";
-import { AnimatePresence, LayoutGroup, motion, useReducedMotion } from "framer-motion";
-import { Check, Pause, Play, RotateCcw } from "lucide-react";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { CALL_SECONDS } from "@/lib/voice/call-window";
+import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
+import { Check, RotateCcw } from "lucide-react";
+import { useEffect, useMemo, useState } from "react";
 
 type Turn = {
   seq: number;
@@ -30,8 +30,7 @@ export type InsightCall = {
   insight_fit: number | null;
   insight_tone_label: string | null;
   insight_fit_label: string | null;
-  assembly_session_id: string | null;
-  transcript_turns: Turn[];
+  left_message: boolean;
 };
 
 const ease = [0.16, 1, 0.3, 1] as const;
@@ -62,7 +61,7 @@ function insightBadge(status: string | null, intent: string | null) {
 }
 
 function minutesLabel(seconds: number | null) {
-  const value = Math.max(1, Math.round((seconds ?? 30) / 60));
+  const value = Math.max(1, Math.round((seconds ?? CALL_SECONDS) / 60));
   return `${value} min call`;
 }
 
@@ -80,45 +79,52 @@ function ScoreCard({ label, value, note }: { label: string; value: number | null
   );
 }
 
-function SpokenAnswer({
-  text,
-  cursor,
-  playing,
-}: {
-  text: string;
-  cursor: number;
-  playing: boolean;
-}) {
-  const parts = useMemo(() => text.split(/(\s+)/), [text]);
-  let word = 0;
+function sameLine(a: string, b: string) {
+  return a.trim().toLowerCase() === b.trim().toLowerCase();
+}
+
+function CallTranscript({ turns }: { turns: Turn[] }) {
+  if (turns.length === 0) {
+    return <p className="mt-3 text-[13px] text-muted">No transcript saved for this call yet.</p>;
+  }
 
   return (
-    <p className="mt-2 min-h-0 overflow-y-auto text-[13px] leading-snug text-ink/90">
-      {parts.map((part, i) => {
-        if (!part.trim()) return <span key={i}>{part}</span>;
-        const idx = word++;
-        const spoken = !playing || idx <= cursor;
+    <ul className="mt-3 max-h-44 space-y-2.5 overflow-y-auto overscroll-contain pr-1">
+      {turns.map((turn) => {
+        const visitor = turn.speaker === "visitor";
         return (
-          <span key={i} className={playing ? (spoken ? "text-ink" : "text-ink/30") : undefined}>
-            {part}
-          </span>
+          <li
+            key={`${turn.seq}-${turn.speaker}`}
+            className={`flex ${visitor ? "justify-end" : "justify-start"}`}
+          >
+            <div
+              className={`max-w-[94%] px-3 py-2 ${
+                visitor
+                  ? "rounded-2xl rounded-br-md bg-[#2A6F97]/12 dark:bg-[#2A6F97]/20"
+                  : "rounded-2xl rounded-bl-md border border-[#01497C]/10 bg-[#F8FAFC] dark:border-[#89C2D9]/20 dark:bg-[#012A4A]/40"
+              }`}
+            >
+              <p className="font-mono text-[9px] font-medium tracking-wide text-[#468FAF] uppercase">
+                {visitor ? "Visitor" : "Agent"}
+              </p>
+              <p className="mt-0.5 text-[13px] leading-relaxed text-ink">{turn.text}</p>
+            </div>
+          </li>
         );
       })}
-    </p>
+    </ul>
   );
 }
 
 export function InsightsDashboard() {
   const reduce = useReducedMotion();
-  const audioRef = useRef<HTMLAudioElement | null>(null);
   const [calls, setCalls] = useState<InsightCall[] | null>(null);
   const [error, setError] = useState("");
   const [activeId, setActiveId] = useState<string | null>(null);
-  const [playing, setPlaying] = useState(false);
-  const [cursor, setCursor] = useState(0);
   const [pane, setPane] = useState<"feed" | "inspect">("feed");
-  const [playError, setPlayError] = useState("");
   const [retrying, setRetrying] = useState(false);
+  const [turns, setTurns] = useState<Turn[]>([]);
+  const [turnsStatus, setTurnsStatus] = useState<"idle" | "loading" | "ready">("idle");
 
   async function load() {
     const response = await fetch("/api/voice/calls");
@@ -149,46 +155,32 @@ export function InsightsDashboard() {
   }, [pending]);
 
   const active = calls?.find((call) => call.id === activeId) ?? calls?.[0] ?? null;
-  const previewText =
-    active?.insight_summary ||
-    active?.transcript_turns
-      .filter((turn) => turn.speaker === "agent")
-      .map((turn) => turn.text)
-      .join(" ") ||
-    active?.visitor_purpose ||
-    "";
+  const topic = (active?.insight_query || active?.visitor_purpose || "").trim();
+  const summary = (active?.insight_summary || "").trim();
+  const summaryAddsDetail =
+    Boolean(summary) && !sameLine(summary, topic) && summary.length >= 40;
+  const citation = (active?.insight_citation || "").trim();
+  const showCitation = Boolean(citation) && !sameLine(citation, "Transcript");
 
   useEffect(() => {
-    audioRef.current?.pause();
-    setPlaying(false);
-    setCursor(0);
-    setPlayError("");
-  }, [active?.id]);
-
-  useEffect(() => {
-    if (!playing || !previewText) {
-      setCursor(0);
+    if (!active?.id) {
+      setTurns([]);
+      setTurnsStatus("idle");
       return;
     }
-    const words = previewText.trim().split(/\s+/).filter(Boolean);
-    if (reduce || words.length === 0) {
-      const hold = window.setTimeout(() => setPlaying(false), 1600);
-      return () => window.clearTimeout(hold);
-    }
-    setCursor(0);
-    let i = 0;
-    const tick = window.setInterval(() => {
-      i += 1;
-      if (i >= words.length) {
-        setCursor(words.length);
-        setPlaying(false);
-        window.clearInterval(tick);
-        return;
-      }
-      setCursor(i);
-    }, 210);
-    return () => window.clearInterval(tick);
-  }, [playing, active?.id, previewText, reduce]);
+    let cancelled = false;
+    setTurnsStatus("loading");
+    void (async () => {
+      const response = await fetch(`/api/voice/transcript?callId=${active.id}`);
+      const payload = (await response.json()) as { turns?: Turn[]; error?: string };
+      if (cancelled) return;
+      setTurns(payload.turns ?? []);
+      setTurnsStatus("ready");
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [active?.id, active?.insight_status]);
 
   const intents = useMemo(() => {
     if (!calls?.length) return [];
@@ -223,29 +215,6 @@ export function InsightsDashboard() {
     } finally {
       setRetrying(false);
     }
-  }
-
-  async function togglePlay() {
-    if (!active) return;
-    if (playing) {
-      audioRef.current?.pause();
-      setPlaying(false);
-      return;
-    }
-    setPlayError("");
-    const response = await fetch(`/api/voice/recording?callId=${active.id}`);
-    const payload = (await response.json()) as { url?: string; error?: string };
-    if (response.ok && payload.url) {
-      const audio = audioRef.current ?? new Audio();
-      audioRef.current = audio;
-      audio.src = payload.url;
-      audio.onended = () => setPlaying(false);
-      await audio.play().catch(() => undefined);
-      setPlaying(true);
-      return;
-    }
-    setPlayError(payload.error || "");
-    setPlaying(true);
   }
 
   if (!calls) return <div className="min-h-[40vh]" />;
@@ -306,8 +275,7 @@ export function InsightsDashboard() {
                 ))}
               </div>
 
-              <LayoutGroup>
-                <div className="grid min-h-0 flex-1 md:grid-cols-[34fr_66fr] lg:grid-cols-[36fr_64fr]">
+              <div className="grid min-h-0 flex-1 md:grid-cols-[34fr_66fr] lg:grid-cols-[36fr_64fr]">
                   <div
                     className={`min-h-[320px] flex-col border-[#01497C]/12 md:min-h-0 md:border-r dark:border-[#89C2D9]/30 ${
                       pane === "feed" ? "flex" : "hidden"
@@ -333,18 +301,10 @@ export function InsightsDashboard() {
                                 setActiveId(call.id);
                                 setPane("inspect");
                               }}
-                              className="relative flex w-full items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-transform duration-150 hover:-translate-y-px"
+                              className={`relative flex w-full cursor-pointer items-center gap-2 rounded-lg px-2 py-1.5 text-left transition-colors duration-150 ${
+                                selected ? "bg-[#F4F8FA] dark:bg-[#01497C]/15" : "hover:bg-subtle"
+                              }`}
                             >
-                              {selected ? (
-                                <>
-                                  <motion.span
-                                    layoutId="dashboardActiveSession"
-                                    className="absolute inset-0 rounded-lg border border-[#2A6F97]/25 bg-[#F4F8FA] dark:bg-[#01497C]/15"
-                                    transition={{ type: "spring", stiffness: 420, damping: 36 }}
-                                  />
-                                  <span className="absolute top-1.5 bottom-1.5 left-0 z-10 w-0.5 rounded-full bg-[#2A6F97]" />
-                                </>
-                              ) : null}
                               <span className="relative z-10 grid h-8 w-8 shrink-0 place-items-center rounded-full border border-border bg-[#012A4A] text-[10px] font-semibold text-white">
                                 {initials(call.visitor_name)}
                               </span>
@@ -352,10 +312,15 @@ export function InsightsDashboard() {
                                 <span className="block truncate text-[13px] font-semibold text-ink">
                                   {call.visitor_name}
                                 </span>
-                                <span className="mt-0.5 flex items-center gap-1.5">
+                                <span className="mt-0.5 flex flex-wrap items-center gap-1.5">
                                   <span className="rounded-full border border-[#01497C]/12 px-1.5 py-px font-mono text-[9px] text-steel dark:border-[#89C2D9]/30">
                                     {insightBadge(call.insight_status, call.insight_intent)}
                                   </span>
+                                  {call.left_message ? (
+                                    <span className="rounded-full bg-[#2A6F97] px-1.5 py-px font-mono text-[9px] font-semibold text-white">
+                                      Left a message
+                                    </span>
+                                  ) : null}
                                   <span className="truncate font-mono text-[10px] text-[#61A5C2]">
                                     {timeAgo(call.started_at)}
                                   </span>
@@ -369,7 +334,7 @@ export function InsightsDashboard() {
                   </div>
 
                   <div
-                    className={`min-h-[420px] flex-col p-3 sm:p-4 md:min-h-0 ${
+                    className={`min-h-[420px] flex-col overflow-hidden p-3 sm:p-4 md:min-h-0 ${
                       pane === "inspect" ? "flex" : "hidden"
                     } md:flex`}
                   >
@@ -381,7 +346,7 @@ export function InsightsDashboard() {
                           animate={{ opacity: 1, y: 0 }}
                           exit={reduce ? undefined : { opacity: 0, y: -6 }}
                           transition={{ duration: 0.22, ease }}
-                          className="flex min-h-0 flex-1 flex-col"
+                          className="flex min-h-0 flex-1 flex-col overflow-hidden"
                         >
                           <div className="flex shrink-0 flex-wrap items-center justify-between gap-2">
                             <div className="flex min-w-0 items-center gap-2.5">
@@ -395,52 +360,61 @@ export function InsightsDashboard() {
                                     <Check size={8} strokeWidth={3} />
                                   </span>
                                 </h3>
-                                <p className="font-mono text-[10px] font-medium text-[#2A6F97] dark:text-ice">
-                                  {insightBadge(active.insight_status, active.insight_intent)}
-                                </p>
+                                <p className="truncate text-[12px] text-muted">{active.visitor_email}</p>
                               </div>
                             </div>
-                            <span className="rounded-full border border-[#01497C]/12 bg-[#F0F4F8] px-2 py-0.5 font-mono text-[10px] font-medium text-[#01497C] dark:border-[#89C2D9]/30 dark:bg-[#012A4A]/40 dark:text-ice">
-                              {minutesLabel(active.duration_seconds)}
-                            </span>
-                          </div>
-
-                          <div className="mt-3 shrink-0 rounded-xl border border-[#01497C]/10 bg-[#F8FAFC] px-3 py-2.5 dark:border-[#89C2D9]/25 dark:bg-[#012A4A]/35">
-                            <p className="font-mono text-[9px] tracking-wider text-[#468FAF] uppercase">
-                              Exact query
-                            </p>
-                            <p className="mt-1 text-[13px] leading-snug font-medium text-ink sm:text-[14px]">
-                              “{active.insight_query || active.visitor_purpose}”
-                            </p>
-                            <p className="mt-1 font-mono text-[10px] text-muted">{active.visitor_email}</p>
-                          </div>
-
-                          <div className="mt-3 flex min-h-0 flex-1 flex-col rounded-xl border border-[#01497C]/12 bg-white px-3 py-2.5 shadow-sm dark:border-[#89C2D9]/30 dark:bg-[#012A4A]/25">
-                            <div className="flex shrink-0 flex-wrap items-center gap-2">
-                              <button
-                                type="button"
-                                onClick={() => void togglePlay()}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-[#012A4A] px-3 py-1.5 text-[11px] font-medium text-white transition-colors hover:bg-[#013A63] dark:bg-ice dark:text-[#071018] dark:hover:bg-[#c5e4f0]"
-                              >
-                                {playing ? <Pause size={12} /> : <Play size={12} />}
-                                {playing ? "Stop" : "Play recording"}
-                              </button>
-                              <VoiceWaveform
-                                compact
-                                state={playing ? "speaking" : "idle"}
-                                className="w-[110px] justify-start sm:w-[150px]"
-                              />
+                            <div className="flex flex-wrap items-center gap-1.5">
+                              <span className="rounded-full border border-[#01497C]/12 px-2 py-0.5 font-mono text-[10px] font-medium text-[#2A6F97] dark:border-[#89C2D9]/30 dark:text-ice">
+                                {insightBadge(active.insight_status, active.insight_intent)}
+                              </span>
+                              <span className="rounded-full border border-[#01497C]/12 bg-[#F0F4F8] px-2 py-0.5 font-mono text-[10px] font-medium text-[#01497C] dark:border-[#89C2D9]/30 dark:bg-[#012A4A]/40 dark:text-ice">
+                                {minutesLabel(active.duration_seconds)}
+                              </span>
                             </div>
-                            {playError ? (
-                              <p className="mt-2 text-[11px] text-muted">{playError} Showing transcript instead.</p>
-                            ) : null}
-                            <SpokenAnswer text={previewText} cursor={cursor} playing={playing} />
-                            <span className="mt-2 inline-flex w-fit shrink-0 rounded-md border border-[#61A5C2]/30 bg-[#61A5C2]/10 px-2 py-0.5 font-mono text-[10px] text-[#01497C] dark:text-ice">
-                              [{active.insight_citation || "Transcript"}]
-                            </span>
                           </div>
 
-                          <div className="mt-3 grid shrink-0 grid-cols-3 gap-2">
+                          {topic ? (
+                            <p className="mt-3 shrink-0 text-[14px] leading-snug text-ink">
+                              <span className="text-muted">Came to talk about </span>
+                              {topic}
+                            </p>
+                          ) : null}
+
+                          {summaryAddsDetail ? (
+                            <div className="mt-3 shrink-0">
+                              <p className="font-mono text-[9px] tracking-wider text-[#468FAF] uppercase">
+                                What happened
+                              </p>
+                              <p className="mt-1 max-h-20 overflow-y-auto pr-1 text-[13px] leading-relaxed text-ink/90">
+                                {summary}
+                              </p>
+                              {showCitation ? (
+                                <p className="mt-1.5 font-mono text-[10px] text-[#468FAF]">Source: {citation}</p>
+                              ) : null}
+                            </div>
+                          ) : null}
+
+                          <div className="mt-3 shrink-0 border-t border-[#01497C]/12 pt-3 dark:border-[#89C2D9]/30">
+                            <p className="shrink-0 text-[13px] font-medium text-ink">
+                              Conversation
+                              {turnsStatus === "ready" ? (
+                                <span className="ml-1.5 font-mono text-[10px] font-normal text-muted">
+                                  {turns.length} turn{turns.length === 1 ? "" : "s"}
+                                </span>
+                              ) : null}
+                            </p>
+                            {turnsStatus === "loading" ? (
+                              <p className="mt-3 text-[13px] text-muted">Loading transcript…</p>
+                            ) : (
+                              <CallTranscript turns={turns} />
+                            )}
+                          </div>
+
+                          <div className="mt-4 shrink-0 border-t border-[#01497C]/12 pt-4 dark:border-[#89C2D9]/30">
+                            <p className="mb-2 font-mono text-[9px] tracking-wider text-[#468FAF] uppercase">
+                              Scores
+                            </p>
+                            <div className="grid grid-cols-3 gap-2">
                             <ScoreCard
                               label="Factual Groundedness"
                               value={active.insight_grounded}
@@ -460,6 +434,7 @@ export function InsightsDashboard() {
                                   : active.insight_fit_label || "Pending"
                               }
                             />
+                            </div>
                           </div>
                           {active.insight_status === "failed" || active.insight_status === "skipped" ? (
                             <div className="mt-3">
@@ -505,8 +480,7 @@ export function InsightsDashboard() {
                       </ul>
                     </div>
                   </div>
-                </div>
-              </LayoutGroup>
+              </div>
             </>
           )}
         </div>

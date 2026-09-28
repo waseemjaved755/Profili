@@ -21,7 +21,7 @@ type Shared = {
 };
 
 const base =
-  "inline-flex min-h-11 items-center justify-center rounded-lg px-5 text-sm font-medium shadow-sm transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
+  "inline-flex min-h-11 cursor-pointer items-center justify-center rounded-lg px-5 text-sm font-medium shadow-sm transition-all duration-150 active:scale-[0.98] disabled:cursor-not-allowed disabled:opacity-40";
 
 export function Button({
   children,
