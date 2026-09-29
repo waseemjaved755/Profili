@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="./cover.png" alt="Profili: Your resume can talk" width="100%" />
+  <img src="./profili.fyi.png" alt="Profili: Your resume can talk" width="100%" />
 </p>
 
 <p align="center">
