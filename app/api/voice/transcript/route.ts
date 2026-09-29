@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth/require-user";
 import { getDb } from "@/lib/db/client";
 import { calls, transcriptTurns } from "@/lib/db/schema";
+import { ownerProfileIds } from "@/lib/resume/owner";
 import { voiceTranscriptBodySchema } from "@/lib/resume/schema";
 import { and, asc, eq } from "drizzle-orm";
 import { NextResponse } from "next/server";
@@ -14,22 +15,16 @@ export async function GET(request: Request) {
     return NextResponse.json({ error: "Missing call." }, { status: 400 });
   }
 
-  const { data: profile } = await auth.supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", auth.user.id)
-    .maybeSingle();
-  if (!profile) {
-    return NextResponse.json({ error: "Call not found." }, { status: 404 });
-  }
-
   const { data: call } = await auth.supabase
     .from("calls")
-    .select("id")
+    .select("id, profile_id")
     .eq("id", callId)
-    .eq("profile_id", profile.id)
     .maybeSingle();
   if (!call) {
+    return NextResponse.json({ error: "Call not found." }, { status: 404 });
+  }
+  const ids = await ownerProfileIds(auth.supabase, auth.user.id);
+  if (!ids.includes(call.profile_id)) {
     return NextResponse.json({ error: "Call not found." }, { status: 404 });
   }
 

@@ -52,6 +52,7 @@ export const parseResumeBodySchema = z.object({
       /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}\.pdf$/i,
       "Invalid resume path.",
     ),
+  profile_id: z.string().uuid().optional(),
 });
 
 export const agentStyleSchema = z.object({
@@ -62,6 +63,7 @@ export const agentStyleSchema = z.object({
 });
 
 export const draftBodySchema = z.object({
+  profile_id: z.string().uuid(),
   full_name: z.string().trim().min(1).max(120),
   greeting: z.string().trim().min(1).max(280),
   headline: z.string().trim().max(240),

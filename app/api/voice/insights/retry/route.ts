@@ -1,6 +1,7 @@
 import { requireUser } from "@/lib/auth/require-user";
 import { EVENT_CALL_ENDED } from "@/lib/inngest/client";
 import { emitEvent } from "@/lib/inngest/emit";
+import { ownerProfileIds } from "@/lib/resume/owner";
 import { z } from "zod";
 import { NextResponse } from "next/server";
 
@@ -22,24 +23,18 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid call." }, { status: 400 });
   }
 
-  const { data: profile } = await auth.supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", auth.user.id)
-    .maybeSingle();
-
-  if (!profile) {
-    return NextResponse.json({ error: "Call not found." }, { status: 404 });
-  }
-
   const { data: call } = await auth.supabase
     .from("calls")
-    .select("id, insight_status")
+    .select("id, insight_status, profile_id")
     .eq("id", parsed.data.callId)
-    .eq("profile_id", profile.id)
     .maybeSingle();
 
   if (!call) {
+    return NextResponse.json({ error: "Call not found." }, { status: 404 });
+  }
+
+  const ids = await ownerProfileIds(auth.supabase, auth.user.id);
+  if (!ids.includes(call.profile_id)) {
     return NextResponse.json({ error: "Call not found." }, { status: 404 });
   }
 

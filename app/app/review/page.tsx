@@ -11,8 +11,20 @@ import {
 import { slugFromName } from "@/lib/resume/sanitize";
 import { publicProfileUrl } from "@/lib/site";
 import { useCallback, useEffect, useMemo, useState } from "react";
+import { useSearchParams } from "next/navigation";
+import { Suspense } from "react";
 
 export default function ReviewPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[40vh]" />}>
+      <ReviewForm />
+    </Suspense>
+  );
+}
+
+function ReviewForm() {
+  const search = useSearchParams();
+  const profileId = search.get("id") || "";
   const [profile, setProfile] = useState<OwnerProfileRow | null>(null);
   const [error, setError] = useState("");
   const [saving, setSaving] = useState(false);
@@ -29,7 +41,11 @@ export default function ReviewPage() {
   const [experience, setExperience] = useState<ProfileJson["experience"]>([]);
 
   const load = useCallback(async () => {
-    const response = await fetch("/api/resume/profile");
+    if (!profileId) {
+      setError("Pick an agent first.");
+      return;
+    }
+    const response = await fetch(`/api/resume/profile?id=${profileId}`);
     const payload = (await response.json()) as {
       profile: OwnerProfileRow | null;
       error?: string;
@@ -48,7 +64,7 @@ export default function ReviewPage() {
     setSkills(json.skills.join(", "));
     setExperience(json.experience);
     setSlug(row.slug || slugFromName(json.full_name || row.full_name));
-  }, []);
+  }, [profileId]);
 
   useEffect(() => {
     void load();
@@ -66,12 +82,14 @@ export default function ReviewPage() {
   );
 
   async function continueToVoice() {
+    if (!profile) return;
     setSaving(true);
     setError("");
     const response = await fetch("/api/resume/profile", {
       method: "PUT",
       headers: { "Content-Type": "application/json" },
       body: JSON.stringify({
+        profile_id: profile.id,
         full_name: fullName,
         greeting,
         headline,
@@ -91,7 +109,7 @@ export default function ReviewPage() {
       setError(payload.error || "Could not save.");
       return;
     }
-    window.location.assign("/app/create");
+    window.location.assign(`/app/create?id=${profile.id}`);
   }
 
   if (!profile && !error) {

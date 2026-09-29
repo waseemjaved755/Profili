@@ -20,29 +20,49 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Invalid resume path." }, { status: 400 });
   }
 
-  const { resume_path } = parsed.data;
+  const { resume_path, profile_id } = parsed.data;
   if (!resume_path.toLowerCase().startsWith(`${auth.user.id.toLowerCase()}/`)) {
     return NextResponse.json({ error: "Invalid resume path." }, { status: 403 });
   }
-
-  const { data: existing } = await auth.supabase
-    .from("profiles")
-    .select("id")
-    .eq("user_id", auth.user.id)
-    .maybeSingle();
 
   const row = {
     user_id: auth.user.id,
     resume_path,
     parse_status: "parsing",
     parse_error: null as string | null,
+    status: "draft" as const,
   };
 
-  const query = existing
-    ? auth.supabase.from("profiles").update(row).eq("user_id", auth.user.id)
-    : auth.supabase.from("profiles").insert({ ...row, status: "draft", full_name: "", greeting: "" });
+  let profile: { id: string } | null = null;
+  let writeError: { message: string } | null = null;
 
-  const { data: profile, error: writeError } = await query.select("id").single();
+  if (profile_id) {
+    const { data, error } = await auth.supabase
+      .from("profiles")
+      .update({
+        resume_path,
+        parse_status: "parsing",
+        parse_error: null,
+        status: "draft",
+      })
+      .eq("id", profile_id)
+      .eq("user_id", auth.user.id)
+      .select("id")
+      .maybeSingle();
+    profile = data;
+    writeError = error;
+    if (!profile && !error) {
+      return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+    }
+  } else {
+    const { data, error } = await auth.supabase
+      .from("profiles")
+      .insert({ ...row, full_name: "", greeting: "" })
+      .select("id")
+      .single();
+    profile = data;
+    writeError = error;
+  }
 
   if (writeError || !profile) {
     return NextResponse.json(

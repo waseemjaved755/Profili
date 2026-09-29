@@ -1,39 +1,30 @@
 import { requireUser } from "@/lib/auth/require-user";
+import { OWNER_PROFILE_COLUMNS, toOwnerProfile } from "@/lib/resume/owner";
 import {
   buildStoredProfile,
   draftBodySchema,
-  profileJsonSchema,
   type ProfileJson,
 } from "@/lib/resume/schema";
 import { NextResponse } from "next/server";
 
-export async function GET() {
+export async function GET(request: Request) {
   const auth = await requireUser();
   if (auth.error) return auth.error;
 
+  const id = new URL(request.url).searchParams.get("id");
   const { data, error } = await auth.supabase
     .from("profiles")
-    .select("id, user_id, slug, status, parse_status, parse_error, full_name, greeting, profile_json, resume_path")
+    .select(OWNER_PROFILE_COLUMNS)
     .eq("user_id", auth.user.id)
-    .maybeSingle();
+    .order("created_at", { ascending: false });
 
   if (error) {
     return NextResponse.json({ error: error.message }, { status: 500 });
   }
 
-  if (!data) {
-    return NextResponse.json({ profile: null });
-  }
-
-  const json = profileJsonSchema.safeParse(data.profile_json);
-  return NextResponse.json({
-    profile: {
-      ...data,
-      parse_status: data.parse_status || "idle",
-      parse_error: data.parse_error ?? null,
-      profile_json: json.success ? json.data : emptyProfile(data.full_name),
-    },
-  });
+  const profiles = (data ?? []).map(toOwnerProfile);
+  const profile = id ? (profiles.find((row) => row.id === id) ?? null) : null;
+  return NextResponse.json({ profiles, profile });
 }
 
 export async function PUT(request: Request) {
@@ -58,6 +49,7 @@ export async function PUT(request: Request) {
   const { data: existing } = await auth.supabase
     .from("profiles")
     .select("id, profile_json")
+    .eq("id", parsed.data.profile_id)
     .eq("user_id", auth.user.id)
     .maybeSingle();
 
@@ -82,8 +74,9 @@ export async function PUT(request: Request) {
       profile_json,
       slug: parsed.data.slug,
     })
+    .eq("id", existing.id)
     .eq("user_id", auth.user.id)
-    .select("id, user_id, slug, status, parse_status, parse_error, full_name, greeting, profile_json, resume_path")
+    .select(OWNER_PROFILE_COLUMNS)
     .single();
 
   if (error || !profile) {
@@ -93,26 +86,45 @@ export async function PUT(request: Request) {
     );
   }
 
-  return NextResponse.json({
-    profile: {
-      ...profile,
-      profile_json: profileJsonSchema.parse(profile.profile_json),
-    },
-  });
+  return NextResponse.json({ profile: toOwnerProfile(profile) });
 }
 
-function emptyProfile(fullName: string): ProfileJson {
-  return {
-    full_name: fullName || "You",
-    headline: "",
-    summary: "",
-    experience: [],
-    education: [],
-    skills: [],
-    projects: [],
-    voice: "Alex",
-    personality: "professional",
-    formality: 0.3,
-    verbosity: 0.5,
-  };
+export async function DELETE(request: Request) {
+  const auth = await requireUser();
+  if (auth.error) return auth.error;
+
+  let json: unknown;
+  try {
+    json = await request.json();
+  } catch {
+    return NextResponse.json({ error: "Invalid JSON." }, { status: 400 });
+  }
+
+  const id =
+    typeof json === "object" && json && "id" in json ? String((json as { id?: string }).id) : "";
+  if (!id) {
+    return NextResponse.json({ error: "Missing agent." }, { status: 400 });
+  }
+
+  const { data: existing } = await auth.supabase
+    .from("profiles")
+    .select("id, resume_path")
+    .eq("id", id)
+    .eq("user_id", auth.user.id)
+    .maybeSingle();
+
+  if (!existing) {
+    return NextResponse.json({ error: "Agent not found." }, { status: 404 });
+  }
+
+  if (existing.resume_path) {
+    await auth.supabase.storage.from("resumes").remove([existing.resume_path]);
+  }
+
+  const { error } = await auth.supabase.from("profiles").delete().eq("id", existing.id).eq("user_id", auth.user.id);
+  if (error) {
+    return NextResponse.json({ error: error.message }, { status: 500 });
+  }
+
+  return NextResponse.json({ ok: true });
 }

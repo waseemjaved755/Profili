@@ -6,115 +6,168 @@ import { MagneticButton } from "@/components/motion/magnetic-button";
 import { PageTransition } from "@/components/motion/reveal";
 import type { OwnerProfileRow } from "@/lib/resume/schema";
 import { publicProfilePath, publicProfileUrl } from "@/lib/site";
-import { Check, Copy } from "lucide-react";
-import { useCallback, useEffect, useState } from "react";
+import { Check, Copy, Plus, Trash2 } from "lucide-react";
+import { useCallback, useEffect, useState, Suspense } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
 
-export default function DashboardPage() {
-  const [profile, setProfile] = useState<OwnerProfileRow | null | undefined>(undefined);
+export default function AgentsPage() {
+  return (
+    <Suspense fallback={<div className="min-h-[40vh]" />}>
+      <AgentsHome />
+    </Suspense>
+  );
+}
+
+function AgentsHome() {
+  const router = useRouter();
+  const search = useSearchParams();
+  const creating = search.get("new") === "1";
+  const [profiles, setProfiles] = useState<OwnerProfileRow[] | undefined>(undefined);
   const [error, setError] = useState("");
+  const [busyId, setBusyId] = useState("");
 
   const load = useCallback(async () => {
     const response = await fetch("/api/resume/profile");
     const payload = (await response.json()) as {
-      profile: OwnerProfileRow | null;
+      profiles?: OwnerProfileRow[];
       error?: string;
     };
     if (!response.ok) {
-      setError(payload.error || "Could not load your profile.");
-      setProfile(null);
+      setError(payload.error || "Could not load your agents.");
+      setProfiles([]);
       return;
     }
-    setProfile(payload.profile);
+    setProfiles(payload.profiles ?? []);
   }, []);
 
   useEffect(() => {
     void load();
   }, [load]);
 
-  if (profile === undefined) {
+  async function remove(id: string, name: string) {
+    const ok = window.confirm(`Delete ${name || "this agent"}? Calls and insights for it go away. You can upload a new resume after.`);
+    if (!ok) return;
+    setBusyId(id);
+    setError("");
+    const response = await fetch("/api/resume/profile", {
+      method: "DELETE",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ id }),
+    });
+    const payload = (await response.json()) as { error?: string };
+    setBusyId("");
+    if (!response.ok) {
+      setError(payload.error || "Could not delete this agent.");
+      return;
+    }
+    await load();
+  }
+
+  if (profiles === undefined) {
     return <div className="min-h-[40vh]" />;
   }
 
-  if (!profile) {
-    return (
-      <PageTransition>
-        <h1 className="text-[40px] font-bold tracking-tight">Upload your resume.</h1>
-        <p className="mt-3 text-[16px] text-muted">
-          PDF only, 5 MB max. We read the text and turn it into a reviewable profile.
-        </p>
-        {error && <p className="mt-4 text-[14px] text-danger">{error}</p>}
-        <div className="mt-10">
-          <ResumeParseUploader onParsed={() => window.location.assign("/app/review")} />
-        </div>
-      </PageTransition>
-    );
-  }
-
-  if (profile.status !== "published" || !profile.slug) {
-    return (
-      <PageTransition>
-        <h1 className="text-[40px] font-bold tracking-tight">Review your profile.</h1>
-        <p className="mt-3 text-[16px] text-muted">
-          We extracted your experience. Check it, then pick a voice.
-        </p>
-        <div className="mt-8 flex flex-wrap gap-3">
-          <MagneticButton href="/app/review" arrow>
-            Continue to review
-          </MagneticButton>
-          <MagneticButton href="/app/create" variant="ghost">
-            Choose voice
-          </MagneticButton>
-        </div>
-        <div className="mt-12">
-          <p className="label">Replace resume</p>
-          <div className="mt-4">
-            <ResumeParseUploader onParsed={() => window.location.assign("/app/review")} />
-          </div>
-        </div>
-      </PageTransition>
-    );
-  }
-
-  const url = publicProfileUrl(profile.slug);
-  const headline = profile.profile_json.headline?.trim();
-  const name = profile.full_name || profile.profile_json.full_name;
+  const empty = profiles.length === 0;
 
   return (
     <PageTransition>
-      <div className="grid gap-6 lg:grid-cols-[minmax(0,1.15fr)_minmax(0,0.85fr)] lg:items-start">
+      <div className="flex flex-wrap items-end justify-between gap-4">
         <div>
-          <p className="label">My Agent</p>
-          <h1 className="mt-2 text-[36px] font-bold tracking-tight sm:text-[44px]">Your AI is live.</h1>
-          {name ? <p className="mt-3 text-[18px] font-medium tracking-tight text-ink">{name}</p> : null}
-          {headline ? <p className="mt-1 text-[15px] text-muted">{headline}</p> : null}
-          <p className="mt-3 max-w-xl text-[15px] text-muted">{profile.greeting}</p>
-          <div className="mt-6 flex flex-wrap gap-2">
-            <MagneticButton href={publicProfilePath(profile.slug)} arrow>
-              Open public page
-            </MagneticButton>
-            <MagneticButton href="/app/review" variant="ghost">
-              Edit profile
-            </MagneticButton>
-            <MagneticButton href="/app/create" variant="ghost">
-              Voice and tone
-            </MagneticButton>
-          </div>
-        </div>
-        <PublicLinkCard url={url} />
-      </div>
-
-      <div className="mt-6 grid gap-6 lg:grid-cols-2 lg:items-stretch">
-        <EmbedSnippet slug={profile.slug} />
-        <section className="rounded-2xl border border-border bg-surface p-5">
-          <p className="label">Replace resume</p>
-          <p className="mt-2 text-[14px] text-muted">
-            Uploading a new PDF sends you back to review as a draft.
+          <p className="label">Agents</p>
+          <h1 className="mt-2 text-[36px] font-bold tracking-tight sm:text-[44px]">
+            {empty ? "Upload your resume." : "Your agents."}
+          </h1>
+          <p className="mt-3 max-w-xl text-[16px] text-muted">
+            {empty
+              ? "PDF only, 5 MB max. We read the text, you pick a voice, then you publish a link."
+              : "Create more than one. Delete one to start over with a new resume, voice, and tone."}
           </p>
-          <div className="mt-4">
-            <ResumeParseUploader compact onParsed={() => window.location.assign("/app/review")} />
-          </div>
-        </section>
+        </div>
+        {!empty ? (
+          <MagneticButton href="/app?new=1">
+            <span className="inline-flex items-center gap-2">
+              <Plus size={16} />
+              New agent
+            </span>
+          </MagneticButton>
+        ) : null}
       </div>
+      {error ? <p className="mt-4 text-[14px] text-danger">{error}</p> : null}
+
+      {(empty || creating) && (
+        <div className="mt-10">
+          {creating && !empty ? (
+            <p className="mb-4 text-[14px] text-muted">New agent. Upload a resume, then review, voice, and publish.</p>
+          ) : null}
+          <ResumeParseUploader onParsed={(id) => router.push(`/app/review?id=${id}`)} />
+        </div>
+      )}
+
+      {!empty ? (
+        <div className="mt-10 grid gap-4">
+          {profiles.map((profile) => {
+            const name = profile.full_name || profile.profile_json.full_name || "Untitled agent";
+            const headline = profile.profile_json.headline?.trim();
+            const live = profile.status === "published" && Boolean(profile.slug);
+            return (
+              <article key={profile.id} className="rounded-2xl border border-border bg-surface p-5">
+                <div className="flex flex-wrap items-start justify-between gap-4">
+                  <div className="min-w-0">
+                    <p className="font-medium tracking-tight text-ink">{name}</p>
+                    {headline ? <p className="mt-1 text-[14px] text-muted">{headline}</p> : null}
+                    <p className="mt-2 font-mono text-[12px] text-muted">
+                      {live ? publicProfileUrl(profile.slug as string) : profile.parse_status === "ready" ? "Draft · ready to review" : profile.parse_status}
+                    </p>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {live ? (
+                      <MagneticButton href={publicProfilePath(profile.slug as string)} arrow>
+                        Open
+                      </MagneticButton>
+                    ) : (
+                      <MagneticButton href={`/app/review?id=${profile.id}`} arrow>
+                        Continue
+                      </MagneticButton>
+                    )}
+                    <MagneticButton href={`/app/review?id=${profile.id}`} variant="ghost">
+                      Edit
+                    </MagneticButton>
+                    <MagneticButton href={`/app/create?id=${profile.id}`} variant="ghost">
+                      Voice and tone
+                    </MagneticButton>
+                    <button
+                      type="button"
+                      disabled={busyId === profile.id}
+                      onClick={() => void remove(profile.id, name)}
+                      className="inline-flex h-11 items-center gap-2 rounded-full border border-border px-4 text-[14px] font-medium text-ink hover:border-danger/40 hover:text-danger disabled:opacity-50"
+                    >
+                      <Trash2 size={15} />
+                      Delete
+                    </button>
+                  </div>
+                </div>
+                {live ? (
+                  <div className="mt-5 grid gap-4 lg:grid-cols-2">
+                    <PublicLinkCard url={publicProfileUrl(profile.slug as string)} />
+                    <EmbedSnippet slug={profile.slug as string} />
+                  </div>
+                ) : null}
+                <div className="mt-5">
+                  <p className="label">Replace resume</p>
+                  <p className="mt-1 text-[13px] text-muted">Sends this agent back to draft. Then pick voice and publish again.</p>
+                  <div className="mt-3">
+                    <ResumeParseUploader
+                      compact
+                      profileId={profile.id}
+                      onParsed={(id) => router.push(`/app/review?id=${id}`)}
+                    />
+                  </div>
+                </div>
+              </article>
+            );
+          })}
+        </div>
+      ) : null}
     </PageTransition>
   );
 }
@@ -129,16 +182,15 @@ function PublicLinkCard({ url }: { url: string }) {
   }
 
   return (
-    <section className="rounded-2xl border border-border bg-surface p-5">
+    <section className="rounded-xl border border-border bg-subtle p-4">
       <p className="label">Public link</p>
-      <p className="mt-2 text-[14px] text-muted">Share this with anyone who should talk to your agent.</p>
-      <div className="mt-4 flex items-center gap-2 rounded-lg border border-border bg-subtle px-3 py-2">
+      <div className="mt-3 flex items-center gap-2 rounded-lg border border-border bg-surface px-3 py-2">
         <p className="min-w-0 flex-1 truncate font-mono text-[13px] text-ink">{url}</p>
         <button
           type="button"
           aria-label={copied ? "Copied link" : "Copy link"}
           onClick={() => void copy()}
-          className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-border bg-surface text-ink transition-colors hover:border-steel/40 hover:bg-surface"
+          className="grid h-9 w-9 shrink-0 place-items-center rounded-md border border-border bg-surface text-ink"
         >
           {copied ? <Check size={15} strokeWidth={2.4} /> : <Copy size={15} strokeWidth={2.4} />}
         </button>

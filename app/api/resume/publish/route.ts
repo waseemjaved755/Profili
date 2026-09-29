@@ -29,6 +29,7 @@ export async function POST(request: Request) {
   const { data: existing } = await supabase
     .from("profiles")
     .select("id, profile_json, slug")
+    .eq("id", parsed.data.profile_id)
     .eq("user_id", user.id)
     .maybeSingle();
 
@@ -36,6 +37,7 @@ export async function POST(request: Request) {
     return NextResponse.json({ error: "Parse a resume before publishing." }, { status: 400 });
   }
 
+  const existingId = existing.id;
   const current = (existing.profile_json ?? {}) as Partial<ProfileJson>;
   const profileJson = buildStoredProfile(current, {
     full_name: parsed.data.full_name,
@@ -54,7 +56,7 @@ export async function POST(request: Request) {
       .from("profiles")
       .select("id")
       .eq("slug", slug)
-      .neq("user_id", user.id)
+      .neq("id", existingId)
       .maybeSingle();
     return Boolean(data);
   }
@@ -73,6 +75,7 @@ export async function POST(request: Request) {
       slug,
       status: "published",
     })
+    .eq("id", existingId)
     .eq("user_id", user.id)
     .select("id, slug, status, full_name, greeting, profile_json")
     .single();

@@ -17,9 +17,11 @@ type ParseStatus = "idle" | "parsing" | "ready" | "failed";
 export function ResumeParseUploader({
   onParsed,
   compact = false,
+  profileId,
 }: {
-  onParsed: () => void;
+  onParsed: (profileId: string) => void;
   compact?: boolean;
+  profileId?: string;
 }) {
   const reduce = useReducedMotion();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -29,8 +31,8 @@ export function ResumeParseUploader({
   const [error, setError] = useState("");
   const [drag, setDrag] = useState(false);
   const [resumePath, setResumePath] = useState("");
-  const [userId, setUserId] = useState("");
-  const watching = phase === "processing" && Boolean(userId);
+  const [agentId, setAgentId] = useState(profileId || "");
+  const watching = phase === "processing" && Boolean(agentId);
 
   useEffect(() => {
     if (!watching) return;
@@ -42,7 +44,7 @@ export function ResumeParseUploader({
       if (status === "ready") {
         setDoneUpTo(3);
         setPhase("done");
-        onParsed();
+        onParsed(agentId);
         return;
       }
       if (status === "failed") {
@@ -53,7 +55,8 @@ export function ResumeParseUploader({
     }
 
     async function poll() {
-      const response = await fetch("/api/resume/profile");
+      const query = agentId ? `?id=${agentId}` : "";
+      const response = await fetch(`/api/resume/profile${query}`);
       const payload = (await response.json()) as {
         profile?: { parse_status?: ParseStatus; parse_error?: string | null };
       };
@@ -61,10 +64,10 @@ export function ResumeParseUploader({
     }
 
     const channel = supabase
-      .channel(`parse-${userId}`)
+      .channel(`parse-${agentId}`)
       .on(
         "postgres_changes",
-        { event: "UPDATE", schema: "public", table: "profiles", filter: `user_id=eq.${userId}` },
+        { event: "UPDATE", schema: "public", table: "profiles", filter: `id=eq.${agentId}` },
         (payload) => {
           const next = payload.new as { parse_status?: ParseStatus; parse_error?: string | null };
           void applyStatus(next.parse_status || "idle", next.parse_error ?? null);
@@ -82,18 +85,19 @@ export function ResumeParseUploader({
       window.clearInterval(timer);
       void supabase.removeChannel(channel);
     };
-  }, [watching, userId, onParsed]);
+  }, [watching, agentId, onParsed]);
 
   async function queueParse(path: string) {
     const response = await fetch("/api/resume/parse", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
-      body: JSON.stringify({ resume_path: path }),
+      body: JSON.stringify({ resume_path: path, profile_id: agentId || profileId || undefined }),
     });
-    const payload = (await response.json()) as { error?: string };
+    const payload = (await response.json()) as { error?: string; profileId?: string };
     if (!response.ok) {
       throw new Error(payload.error || "Could not queue this resume.");
     }
+    if (payload.profileId) setAgentId(payload.profileId);
     setDoneUpTo(1);
     window.setTimeout(() => setDoneUpTo((value) => Math.max(value, 2)), 2500);
     setPhase("processing");
@@ -124,7 +128,6 @@ export function ResumeParseUploader({
         data: { user },
       } = await supabase.auth.getUser();
       if (!user) throw new Error("Sign in required.");
-      setUserId(user.id);
 
       const path = `${user.id}/${crypto.randomUUID()}.pdf`;
       const { error: uploadError } = await supabase.storage.from("resumes").upload(path, file, {

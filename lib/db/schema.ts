@@ -41,7 +41,6 @@ export const profiles = pgTable(
     id: uuid("id").primaryKey().defaultRandom(),
     userId: uuid("user_id")
       .notNull()
-      .unique()
       .references(() => users.id, { onDelete: "cascade" }),
     slug: text("slug"),
     status: profileStatus("status").notNull().default("draft"),
@@ -57,6 +56,7 @@ export const profiles = pgTable(
     updatedAt: timestamp("updated_at", { withTimezone: true }).notNull().defaultNow(),
   },
   (table) => [
+    index("profiles_user_id_idx").on(table.userId),
     uniqueIndex("profiles_slug_unique")
       .on(table.slug)
       .where(sql`${table.slug} is not null`),

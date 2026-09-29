@@ -43,6 +43,13 @@
       "when": 1790467708631,
       "tag": "0005_messages",
       "breakpoints": true
+    },
+    {
+      "idx": 6,
+      "version": "7",
+      "when": 1790700000000,
+      "tag": "0006_multiple_agents",
+      "breakpoints": true
     }
   ]
 }

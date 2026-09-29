@@ -17,8 +17,8 @@ import {
 } from "@/lib/voice/assembly-voices";
 import { useAssemblyVoicePreview } from "@/lib/voice/use-voice-preview";
 import { AnimatePresence, motion, useReducedMotion } from "framer-motion";
-import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useRouter, useSearchParams } from "next/navigation";
+import { Suspense, useEffect, useState } from "react";
 
 const steps = ["Resume", "Voice", "Personality"];
 const gen = [
@@ -29,7 +29,16 @@ const gen = [
 ];
 
 export default function CreatePage() {
+  return (
+    <Suspense fallback={<div className="min-h-[40vh]" />}>
+      <CreateForm />
+    </Suspense>
+  );
+}
+
+function CreateForm() {
   const router = useRouter();
+  const profileId = useSearchParams().get("id") || "";
   const reduce = useReducedMotion();
   const [profile, setProfile] = useState<OwnerProfileRow | null>(null);
   const [loadError, setLoadError] = useState("");
@@ -45,7 +54,11 @@ export default function CreatePage() {
 
   useEffect(() => {
     void (async () => {
-      const response = await fetch("/api/resume/profile");
+      if (!profileId) {
+        setLoadError("Review your resume first.");
+        return;
+      }
+      const response = await fetch(`/api/resume/profile?id=${profileId}`);
       const payload = (await response.json()) as {
         profile: OwnerProfileRow | null;
         error?: string;
@@ -61,7 +74,7 @@ export default function CreatePage() {
       setFormality(json.formality ?? 0.3);
       setVerbosity(json.verbosity ?? 0.5);
     })();
-  }, []);
+  }, [profileId]);
 
   async function create() {
     if (!profile) return;
@@ -89,6 +102,7 @@ export default function CreatePage() {
         skills: json.skills,
         slug: profile.slug || "profile",
         reviewed: true,
+        profile_id: profile.id,
         voice,
         personality,
         formality,
@@ -110,7 +124,7 @@ export default function CreatePage() {
         <h1 className="text-[40px] font-bold tracking-tight">Finish your profile first.</h1>
         <p className="mt-3 text-[16px] text-muted">{loadError}</p>
         <div className="mt-8">
-          <MagneticButton href="/app/review" arrow>
+          <MagneticButton href={profileId ? `/app/review?id=${profileId}` : "/app"} arrow>
             Review resume
           </MagneticButton>
         </div>
@@ -218,7 +232,7 @@ export default function CreatePage() {
                 variant="ghost"
                 onClick={() => {
                   preview.stop();
-                  router.push("/app/review");
+                  router.push(`/app/review?id=${profile.id}`);
                 }}
               >
                 Back
