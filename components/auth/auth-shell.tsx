@@ -1,9 +1,6 @@
 import { Wordmark } from "@/components/ui/wordmark";
 import { ThemeToggle } from "@/components/ui/theme-toggle";
-import { VISITORS } from "@/lib/visitors";
 import type { ReactNode } from "react";
-
-const faces = VISITORS.slice(0, 3);
 
 export function AuthShell({ children }: { children: ReactNode }) {
   return (
@@ -22,19 +19,6 @@ export function AuthShell({ children }: { children: ReactNode }) {
           <h2 className="text-[36px] font-semibold leading-[1.1] tracking-tight text-white sm:text-[44px]">
             Your experience, spoken in real time.
           </h2>
-          <div className="mt-6 flex items-center gap-3">
-            <div className="flex -space-x-3">
-              {faces.map((face) => (
-                <img
-                  key={face.id}
-                  src={face.src}
-                  alt=""
-                  className="h-9 w-9 rounded-full border-2 border-white object-cover"
-                />
-              ))}
-            </div>
-            <p className="text-[13px] font-medium text-white/80">Join 120+ conversations on Profili</p>
-          </div>
         </div>
       </aside>
 
